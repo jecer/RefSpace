@@ -1,3 +1,4 @@
+
 # 🎨 RefSpace
 > Профессиональный бесконечный холст для работы с референсами, поддерживающий изображения, видео и интерактивные связи.
 
@@ -7,7 +8,7 @@
 **RefSpace** — это мощный инструмент для художников, дизайнеров и режиссеров монтажа, позволяющий организовать визуальное рабочее пространство без ограничений. В отличие от аналогов, RefSpace полностью поддерживает видеофайлы и YouTube-плееры, позволяя создавать живые мудборды. Поскольку приложение распространяется в виде готового `.exe` файла, вам не нужно ничего собирать — просто запустите программу и начните творить!
 
 ---
-
+<img width="2541" height="1352" alt="scrin1" src="https://github.com/user-attachments/assets/216e5aed-0e62-4a6d-81d6-2eab85bacbb0" />
 ## ⚙️ Как это работает (Функции программы)
 
 ### 1. Бесконечный холст
@@ -59,7 +60,7 @@
 > A professional infinite canvas for references, supporting images, videos, and interactive connections.
 
 **RefSpace** is a powerful tool for artists, designers, and video editors to organize a visual workspace without limits. Unlike alternatives, RefSpace fully supports video files and YouTube players, allowing you to create live mood boards. Since this application is distributed as a ready-to-use `.exe` file, you don't need to build anything — just launch the program and start creating!
-
+<img width="2541" height="1352" alt="scrin1" src="https://github.com/user-attachments/assets/216e5aed-0e62-4a6d-81d6-2eab85bacbb0" />
 ## ⚙️ How It Works (Features)
 
 ### 1. Infinite Canvas
