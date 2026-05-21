@@ -9,6 +9,7 @@
 
 ---
 <img width="2541" height="1352" alt="scrin1" src="https://github.com/user-attachments/assets/216e5aed-0e62-4a6d-81d6-2eab85bacbb0" />
+
 ## ⚙️ Как это работает (Функции программы)
 
 ### 1. Бесконечный холст
