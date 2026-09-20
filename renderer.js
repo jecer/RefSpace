@@ -1,35 +1,34 @@
-const { ipcRenderer, clipboard, nativeImage, webUtils } = require('electron');
 
 // --- Управление окном ---
 document.getElementById('btn-close').addEventListener('click', () => tryCloseApp());
-document.getElementById('btn-maximize').addEventListener('click', () => ipcRenderer.send('window-maximize'));
-document.getElementById('btn-minimize').addEventListener('click', () => ipcRenderer.send('window-minimize'));
+document.getElementById('btn-maximize').addEventListener('click', () => refspace.window.maximize());
+document.getElementById('btn-minimize').addEventListener('click', () => refspace.window.minimize());
 
 const opacitySlider = document.getElementById('opacity-slider');
 opacitySlider.addEventListener('input', (e) => {
-  ipcRenderer.send('set-opacity', e.target.value);
+  refspace.window.setOpacity(e.target.value);
 });
 
 const alwaysOnTopCheckbox = document.getElementById('always-on-top');
 alwaysOnTopCheckbox.addEventListener('change', (e) => {
-  ipcRenderer.send('set-always-on-top', e.target.checked);
+  refspace.window.setAlwaysOnTop(e.target.checked);
 });
 
 const clickThroughCheckbox = document.getElementById('click-through');
 clickThroughCheckbox.addEventListener('change', (e) => {
-  ipcRenderer.send('set-click-through', e.target.checked);
+  refspace.window.setClickThrough(e.target.checked);
   if (e.target.checked) {
     alwaysOnTopCheckbox.checked = true;
-    ipcRenderer.send('set-always-on-top', true);
+    refspace.window.setAlwaysOnTop(true);
   }
 });
 
 // Отлавливаем отключение по горячей клавише
-ipcRenderer.on('click-through-changed', (event, state) => {
+refspace.window.onClickThroughChanged((state) => {
   clickThroughCheckbox.checked = state;
   if (state) {
     alwaysOnTopCheckbox.checked = true;
-    ipcRenderer.send('set-always-on-top', true);
+    refspace.window.setAlwaysOnTop(true);
   }
 });
 
@@ -40,7 +39,7 @@ let currentHotkey = localStorage.getItem('refspace-clickthrough-hotkey') || 'F4'
 
 hotkeyInput.value = currentHotkey;
 hotkeyHint.innerHTML = t('panel.disableHint', { key: currentHotkey });
-ipcRenderer.send('update-click-through-hotkey', currentHotkey);
+refspace.window.setClickThroughHotkey(currentHotkey);
 
 let isRecordingHotkey = false;
 
@@ -79,7 +78,7 @@ hotkeyInput.addEventListener('keydown', (e) => {
   isRecordingHotkey = false;
   hotkeyInput.blur();
 
-  ipcRenderer.send('update-click-through-hotkey', currentHotkey);
+  refspace.window.setClickThroughHotkey(currentHotkey);
 });
 
 hotkeyInput.addEventListener('blur', () => {
@@ -1217,8 +1216,8 @@ function handleFile(file, mouseX, mouseY, onLoadedCallback = null) {
 
   if (file.type.startsWith('image/')) {
     let filePath = file.path;
-    if (!filePath && webUtils) {
-      filePath = webUtils.getPathForFile(file);
+    if (!filePath) {
+      filePath = refspace.media.pathForDroppedFile(file);
     }
 
     const { item, contentWrap, title } = createItemContainer(mouseX, mouseY, filePath || '');
@@ -1252,8 +1251,8 @@ function handleFile(file, mouseX, mouseY, onLoadedCallback = null) {
   }
   else if (file.type.startsWith('video/')) {
     let filePath = file.path;
-    if (!filePath && webUtils) {
-      filePath = webUtils.getPathForFile(file);
+    if (!filePath) {
+      filePath = refspace.media.pathForDroppedFile(file);
     }
 
     const { item, contentWrap, title } = createItemContainer(mouseX, mouseY, filePath || '');
@@ -1420,7 +1419,7 @@ function setupMarkerLogic(containerItem, mediaElement, isYouTube, localFile = nu
   buttonsRow.appendChild(btnScreenshot);
   buttonsRow.appendChild(btnClearAll);
 
-  btnScreenshot.onclick = (e) => {
+  btnScreenshot.onclick = async (e) => {
     e.stopPropagation();
     try {
       // Для YouTube нам нужно найти само видео внутри контейнера, так как mediaElement может быть прокси-объектом
@@ -1434,8 +1433,7 @@ function setupMarkerLogic(containerItem, mediaElement, isYouTube, localFile = nu
       const dataUrl = canvas.toDataURL('image/png');
 
       // 1. Копируем в буфер обмена
-      const image = nativeImage.createFromDataURL(dataUrl);
-      clipboard.writeImage(image);
+      await refspace.clipboard.writeImage(dataUrl);
 
       // 2. Вставляем рядом на холст
       const currentLeft = parseFloat(containerItem.style.left) || 0;
@@ -1651,7 +1649,7 @@ function updateMarkerInfo(markers, listElement, playIntervalCallback) {
 // Функция логирования в файл через IPC
 function flog(msg) {
   if (window.ipcRenderer) {
-    ipcRenderer.send('log-to-file', msg);
+    refspace.log(msg);
   }
 }
 
@@ -1721,9 +1719,7 @@ function addYouTubeVideo(videoId) {
 
     try {
       // Специальный запрос, который main.js перехватит и обработает через yt-dlp
-      const rawData = await ipcRenderer.invoke('fetch-video-info', {
-        url: `https://local.ytdlp/videos/${id}`
-      });
+      const rawData = await refspace.media.resolveYouTube(id);
 
       const data = JSON.parse(rawData);
       if (data && data.videoStreams && data.videoStreams[0].url) {
@@ -1731,24 +1727,9 @@ function addYouTubeVideo(videoId) {
         return { video: data.videoStreams[0].url, audio: data.audioStreams?.[0]?.url || data.videoStreams[0].url };
       }
     } catch (e) {
-      flog(`[ERROR] yt-dlp failed: ${e.message}. Falling back to Piped...`);
+      flog(`[ERROR] yt-dlp failed: ${e.message}`);
     }
 
-    // РЕЗЕРВ (только если yt-dlp сломался или его нет)
-    const pipedInstances = ['https://pipedapi.kavin.rocks', 'https://api.piped.victr.me'];
-    for (const base of pipedInstances) {
-      try {
-        statusMsg.textContent = `РЕЗЕРВ: PIPED...`;
-        const rawData = await ipcRenderer.invoke('fetch-video-info', { url: `${base}/streams/${id}` });
-        if (!rawData || rawData.length < 500) continue;
-        const data = JSON.parse(rawData);
-        if (data && data.videoStreams) {
-          const vStream = data.videoStreams.find(s => !s.videoOnly) || data.videoStreams[0];
-          const aStream = data.audioStreams?.[0] || vStream;
-          if (vStream && vStream.url) return { video: vStream.url, audio: aStream.url };
-        }
-      } catch (e) { }
-    }
     return null;
   }
 
@@ -1883,13 +1864,13 @@ window.addEventListener('mousedown', (e) => {
 
 
 // --- Вставка из буфера обмена (Ctrl+V) ---
-function doPaste(clipboardDataOverride, isMenuPaste = false) {
+async function doPaste(clipboardDataOverride, isMenuPaste = false) {
   if (document.activeElement && document.activeElement.tagName.toLowerCase() === 'input') return;
 
   // Читаем текст из буфера обмена (через Electron API)
   const textData = clipboardDataOverride
     ? clipboardDataOverride.getData('text')
-    : clipboard.readText();
+    : await refspace.clipboard.readText();
 
   if (textData && textData.includes('myPureRefSignature')) {
     try {
@@ -2030,9 +2011,19 @@ function doPaste(clipboardDataOverride, isMenuPaste = false) {
     }
   }
 
+  // Синхронно считываем файлы из clipboardData до первого await — после него e.clipboardData станет недоступен
+  const overridePastedFiles = [];
+  if (clipboardDataOverride && clipboardDataOverride.items) {
+    for (let i = 0; i < clipboardDataOverride.items.length; i++) {
+      if (clipboardDataOverride.items[i].type.indexOf('image') !== -1) {
+        overridePastedFiles.push(clipboardDataOverride.items[i].getAsFile());
+      }
+    }
+  }
+
   // --- Поддержка формата PureRef ---
   try {
-    const prBuf = clipboard.readBuffer('pureref/binary');
+    const prBuf = await refspace.clipboard.readPureRef();
     if (prBuf && prBuf.length > 0) {
       const prItems = [];
       const sig = Buffer.from('004700720061007000680069006300730049006d006100670065004900740065006d', 'hex');
@@ -2139,23 +2130,16 @@ function doPaste(clipboardDataOverride, isMenuPaste = false) {
     console.error('PureRef parse failed', e);
   }
 
-  // Сначала пробуем clipboardData (может содержать несколько файлов)
-  let expectedPastedCount = 0;
-  if (clipboardDataOverride && clipboardDataOverride.items) {
-    for (let i = 0; i < clipboardDataOverride.items.length; i++) {
-      if (clipboardDataOverride.items[i].type.indexOf('image') !== -1) {
-        expectedPastedCount++;
-      }
-    }
-  }
+  // Сначала пробуем clipboardData (может содержать несколько файлов; уже считано выше, до await)
+  const expectedPastedCount = overridePastedFiles.length;
 
   if (expectedPastedCount > 0) {
     (async () => {
       let offsetStep = 0;
       let pastedItems = [];
-      for (let i = 0; i < clipboardDataOverride.items.length; i++) {
-        if (clipboardDataOverride.items[i].type.indexOf('image') !== -1) {
-          const blob = clipboardDataOverride.items[i].getAsFile();
+      for (let i = 0; i < overridePastedFiles.length; i++) {
+        if (overridePastedFiles[i].type.indexOf('image') !== -1) {
+          const blob = overridePastedFiles[i];
           if (!blob) continue;
           const url = URL.createObjectURL(blob);
           const mouseX = globalMouseX + (offsetStep * 30 * scale);
@@ -2200,9 +2184,9 @@ function doPaste(clipboardDataOverride, isMenuPaste = false) {
   }
 
   // Вставка картинки из системного буфера обмена (fallback)
-  const clipImg = clipboard.readImage();
-  if (clipImg && !clipImg.isEmpty()) {
-    const url = clipImg.toDataURL();
+  const clipDataUrl = await refspace.clipboard.readImage();
+  if (clipDataUrl) {
+    const url = clipDataUrl;
     const mouseX = globalMouseX;
     const mouseY = globalMouseY;
 
@@ -2510,7 +2494,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-function doCopy() {
+async function doCopy() {
   const selectedItems = document.querySelectorAll('.canvas-item.selected-item');
   if (selectedItems.length === 0) return;
 
@@ -2563,28 +2547,20 @@ function doCopy() {
     internalClipboard.push(itemData);
   });
 
-  const clipboardPayload = {
-    text: JSON.stringify({ myPureRefSignature: 'mpref1', items: internalClipboard })
-  };
-
   // Найти первую картинку для вставки в системный буфер
   const firstImgItem = Array.from(selectedItems).find(el => el.dataset.type === 'image');
+  let img, canvas;
   if (firstImgItem) {
-    const img = firstImgItem.querySelector('img');
+    img = firstImgItem.querySelector('img');
     if (img) {
       try {
-        let image;
-        if (img.dataset.originalPath) {
-          image = nativeImage.createFromPath(img.dataset.originalPath);
-        } else {
-          const canvas = document.createElement('canvas');
+        if (!img.dataset.originalPath) {
+          canvas = document.createElement('canvas');
           canvas.width = img.naturalWidth;
           canvas.height = img.naturalHeight;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0);
-          image = nativeImage.createFromDataURL(canvas.toDataURL('image/png'));
         }
-        clipboardPayload.image = image;
 
         img.style.opacity = '0.5';
         setTimeout(() => img.style.opacity = '1', 200);
@@ -2599,7 +2575,13 @@ function doCopy() {
     setTimeout(() => el.style.opacity = '1', 200);
   }
 
-  clipboard.write(clipboardPayload);
+  const payload = { text: JSON.stringify({ myPureRefSignature: 'mpref1', items: internalClipboard }) };
+  if (img?.dataset.originalPath) {
+    payload.imagePath = img.dataset.originalPath;
+  } else if (canvas) {
+    payload.imageDataUrl = canvas.toDataURL('image/png');
+  }
+  await refspace.clipboard.writeItems(payload);
 }
 
 // --- Функции соединительных линий ---
@@ -2868,7 +2850,7 @@ async function saveProject(forceSaveAs = false) {
   const projectData = getProjectData();
 
   const pathArg = forceSaveAs ? null : currentProjectPath;
-  const result = await ipcRenderer.invoke('save-project', projectData, pathArg, t('modal.saveTitle'));
+  const result = await refspace.project.save(projectData, pathArg, t('modal.saveTitle'));
 
   if (result.success) {
     currentProjectPath = result.filePath;
@@ -2891,7 +2873,7 @@ function hasUnsavedChanges() {
 
 async function tryCloseApp() {
   if (!hasUnsavedChanges()) {
-    ipcRenderer.send('window-close');
+    refspace.window.close();
     return;
   }
   showCloseConfirmModal(false);
@@ -2960,7 +2942,7 @@ function showCloseConfirmModal(isCloseProject = false) {
     if (isCloseProject) {
       closeProject();
     } else {
-      ipcRenderer.send('window-close');
+      refspace.window.close();
     }
   });
 
@@ -2970,7 +2952,7 @@ function showCloseConfirmModal(isCloseProject = false) {
       if (isCloseProject) {
         closeProject();
       } else {
-        ipcRenderer.send('window-close');
+        refspace.window.close();
       }
     }
   });
@@ -2989,9 +2971,9 @@ function showCloseConfirmModal(isCloseProject = false) {
 async function openProject(filePath = null) {
   let result;
   if (filePath && typeof filePath === 'string') {
-    result = await ipcRenderer.invoke('open-project-from-path', filePath);
+    result = await refspace.project.openPath(filePath);
   } else {
-    result = await ipcRenderer.invoke('open-project', t('panel.btnOpen'));
+    result = await refspace.project.open(t('panel.btnOpen'));
   }
 
 
@@ -3023,7 +3005,7 @@ async function openProject(filePath = null) {
       let newItem;
       if (itemData.type === 'image' || itemData.type === 'video') {
         // Проверяем наличие файла через основной процесс для надежности
-        const hasValidPath = await ipcRenderer.invoke('check-file-exists', itemData.path);
+        const hasValidPath = await refspace.project.fileExists(itemData.path);
 
         console.log(`[OPEN] Item: ${itemData.title}, Path: ${itemData.path}, Valid: ${hasValidPath}`);
 
@@ -3242,9 +3224,7 @@ async function fetchYouTubeStreamForElement(videoId, videoElement, containerItem
   containerItem._cleanupSync = () => clearInterval(driftCheck);
 
   try {
-    const rawData = await ipcRenderer.invoke('fetch-video-info', {
-      url: `https://local.ytdlp/videos/${videoId}`
-    });
+    const rawData = await refspace.media.resolveYouTube(videoId);
     const data = JSON.parse(rawData);
     if (data && data.videoStreams && data.videoStreams[0].url) {
       statusMsg.style.display = 'none';
@@ -3530,14 +3510,14 @@ window.addEventListener('contextmenu', (e) => {
 });
 
 // Обработка открытия проекта из аргументов запуска
-ipcRenderer.invoke('get-startup-file').then(filePath => {
+refspace.project.startupFile().then(filePath => {
   if (filePath) {
     openProject(filePath);
   }
 });
 
 // Обработка открытия проекта при запущенном приложении (второй экземпляр)
-ipcRenderer.on('open-project-file', (event, filePath) => {
+refspace.window.onOpenProjectFile((filePath) => {
   if (filePath) {
     if (hasUnsavedChanges()) {
       if (confirm(t('alert.unsaved'))) {
