@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
 const appProtocol = require('./protocol');
+const dohProxy = require('./dohproxy');
 
 // registerSchemesAsPrivileged обязан вызываться до app.ready
 appProtocol.registerScheme();
@@ -85,6 +86,8 @@ if (!gotTheLock) {
 
   app.whenReady().then(() => {
     appProtocol.installHandler();
+    // Поднимаем до окна: к моменту первого запроса видео прокси уже слушает.
+    dohProxy.start(writeLog).catch(err => writeLog(`[DOH] запуск не удался: ${err.message}`));
     createWindow();
     registerClickThroughHotkey('F4');
   });
@@ -125,7 +128,11 @@ const CODEC_RANK = { vp9: 3, avc1: 2, av01: 1 };
 async function resolveViaInvidious(videoId) {
   for (const base of INVIDIOUS_MIRRORS) {
     try {
-      const res = await net.fetch(`${base}/api/v1/videos/${videoId}`);
+      // Короткий срок: мёртвое зеркало не должно задерживать ответ. Раньше
+      // перебор четырёх адресов по таймауту занимал около минуты, и всё это
+      // время пользователь смотрел на пустой проигрыватель.
+      const res = await net.fetch(`${base}/api/v1/videos/${videoId}`,
+        { signal: AbortSignal.timeout(6000) });
       if (!res.ok) { writeLog(`[INVIDIOUS] ${base}: HTTP ${res.status}`); continue; }
       const data = await res.json();
       const formats = Array.isArray(data && data.adaptiveFormats) ? data.adaptiveFormats : [];
@@ -180,9 +187,14 @@ function resolveViaYtdlp(videoId) {
 
   writeLog(`[MAIN] Using yt-dlp for video: ${videoId}`);
   return new Promise((resolve, reject) => {
+    // Через локальный прокси: он резолвит имена сам, поэтому yt-dlp работает
+    // и там, где провайдер не отдаёт адрес youtube.com. Если прокси почему-то
+    // не поднялся, идём напрямую — хуже, чем было, не станет.
+    const viaProxy = dohProxy.url() ? `--proxy "${dohProxy.url()}" ` : '';
+
     // Кодек не ограничиваем. h264, vp9 и av01 проверены на этом Electron
     // и играют вплоть до 2160p, поэтому берём лучшее, что есть.
-    exec(`"${ytdlpPath}" -f "bestvideo+bestaudio/best" -g "https://www.youtube.com/watch?v=${videoId}"`, (error, stdout, stderr) => {
+    exec(`"${ytdlpPath}" ${viaProxy}-f "bestvideo+bestaudio/best" -g "https://www.youtube.com/watch?v=${videoId}"`, (error, stdout, stderr) => {
       if (error) {
         writeLog(`[YT-DLP] Error: ${stderr}`);
         reject(error);

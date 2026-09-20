@@ -25,6 +25,7 @@
       "main.js",
       "preload.js",
       "protocol.js",
+      "dohproxy.js",
       "renderer.js",
       "i18n.js",
       "index.html",
