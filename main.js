@@ -94,40 +94,67 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// Зеркала Piped запрашивают YouTube у себя на сервере и отдают готовые ссылки
-// на потоки. Это резерв на случай, когда yt-dlp не может сам добраться до
-// youtube.com — например, когда провайдер не резолвит его имя. Тогда DNS
-// пользователя для метаданных не нужен вовсе.
-const PIPED_MIRRORS = [
-  { api: 'https://pipedapi.kavin.rocks', domain: 'kavin.rocks' },
-  { api: 'https://api.piped.victr.me', domain: 'victr.me' },
-  { api: 'https://pipedapi.adminforge.de', domain: 'adminforge.de' },
-  { api: 'https://api.piped.private.coffee', domain: 'private.coffee' }
+// Invidious спрашивает YouTube со своего сервера и возвращает готовые ссылки
+// на потоки, которые ведут прямо на googlevideo. Это резерв для случая, когда
+// yt-dlp не может сам добраться до youtube.com — например, когда провайдер не
+// резолвит его имя. Тогда DNS пользователя для метаданных не нужен вовсе.
+//
+// Сеть Piped, которой этот резерв был раньше, перестала отвечать целиком,
+// поэтому здесь её больше нет.
+const INVIDIOUS_MIRRORS = [
+  'https://invidious.f5.si',
+  'https://inv.nadeko.net',
+  'https://yewtu.be',
+  'https://invidious.nerdvpn.de'
 ];
 
-async function resolveViaPiped(videoId) {
-  for (const mirror of PIPED_MIRRORS) {
+function codecOf(type) {
+  return ((type || '').match(/codecs="([^".]+)/) || [])[1] || '';
+}
+
+function heightOf(f) {
+  const label = f.qualityLabel || f.resolution || '';
+  return parseInt(label, 10) || 0;
+}
+
+// Все три кодека проверены на этом Electron и играют вплоть до 2160p,
+// поэтому выбираем просто по разрешению. При равном — vp9: он и лёгок
+// для декодера, и распространён шире av01.
+const CODEC_RANK = { vp9: 3, avc1: 2, av01: 1 };
+
+async function resolveViaInvidious(videoId) {
+  for (const base of INVIDIOUS_MIRRORS) {
     try {
-      const res = await net.fetch(`${mirror.api}/streams/${videoId}`);
-      if (!res.ok) { writeLog(`[PIPED] ${mirror.api}: HTTP ${res.status}`); continue; }
+      const res = await net.fetch(`${base}/api/v1/videos/${videoId}`);
+      if (!res.ok) { writeLog(`[INVIDIOUS] ${base}: HTTP ${res.status}`); continue; }
       const data = await res.json();
-      if (!data || !Array.isArray(data.videoStreams)) continue;
+      const formats = Array.isArray(data && data.adaptiveFormats) ? data.adaptiveFormats : [];
 
-      // Нужен слитый поток: в нём есть и картинка, и звук, и это H.264,
-      // который Electron умеет проигрывать.
-      const v = data.videoStreams.find(s => !s.videoOnly) || data.videoStreams[0];
-      const a = (data.audioStreams && data.audioStreams[0]) || v;
-      if (!v || !v.url) continue;
+      const videos = formats
+        .filter(f => (f.type || '').startsWith('video') && f.url && CODEC_RANK[codecOf(f.type)])
+        .sort((a, b) => heightOf(b) - heightOf(a) ||
+                        CODEC_RANK[codecOf(b.type)] - CODEC_RANK[codecOf(a.type)]);
+      const audios = formats
+        .filter(f => (f.type || '').startsWith('audio') && f.url)
+        .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
 
-      const videoToken = appProtocol.registerStream(v.url, mirror.domain);
-      if (!videoToken) { writeLog(`[PIPED] ${mirror.api}: недопустимый хост потока`); continue; }
-      writeLog(`[PIPED] Success via ${mirror.api}`);
+      // Слитый поток, если он есть: одна дорожка вместо двух — меньше рассинхрона.
+      const merged = (data.formatStreams || []).filter(f => f.url).sort((a, b) => heightOf(b) - heightOf(a))[0];
+
+      const v = videos[0] || merged;
+      if (!v) { writeLog(`[INVIDIOUS] ${base}: подходящих потоков нет`); continue; }
+      const a = videos[0] ? audios[0] : null;
+
+      const videoToken = appProtocol.registerStream(v.url);
+      if (!videoToken) { writeLog(`[INVIDIOUS] ${base}: недопустимый хост потока`); continue; }
+
+      writeLog(`[INVIDIOUS] Success via ${base}: ${codecOf(v.type) || 'merged'} ${heightOf(v)}p`);
       return {
         videoToken,
-        audioToken: appProtocol.registerStream(a.url || v.url, mirror.domain) || videoToken
+        audioToken: (a && appProtocol.registerStream(a.url)) || videoToken
       };
     } catch (err) {
-      writeLog(`[PIPED] ${mirror.api}: ${err.message}`);
+      writeLog(`[INVIDIOUS] ${base}: ${err.message}`);
     }
   }
   return null;
@@ -137,11 +164,11 @@ async function resolveYouTubeStreams(videoId) {
   try {
     const direct = await resolveViaYtdlp(videoId);
     if (direct) return direct;
-    writeLog('[MAIN] yt-dlp недоступен, пробуем зеркала Piped');
+    writeLog('[MAIN] yt-dlp недоступен, пробуем Invidious');
   } catch (err) {
-    writeLog(`[MAIN] yt-dlp не справился (${String(err.message).split('\n')[0]}), пробуем зеркала Piped`);
+    writeLog(`[MAIN] yt-dlp не справился (${String(err.message).split('\n')[0]}), пробуем Invidious`);
   }
-  return resolveViaPiped(videoId);
+  return resolveViaInvidious(videoId);
 }
 
 function resolveViaYtdlp(videoId) {
@@ -153,10 +180,9 @@ function resolveViaYtdlp(videoId) {
 
   writeLog(`[MAIN] Using yt-dlp for video: ${videoId}`);
   return new Promise((resolve, reject) => {
-    // Формат ограничен H.264 и AAC намеренно. bestvideo отдаёт AV1 с Opus в
-    // 2160p, а Electron их не декодирует — вместо картинки получается серый
-    // проигрыватель. avc1+mp4a играет везде, ценой потолка в 1080p.
-    exec(`"${ytdlpPath}" -f "bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/best[vcodec^=avc1]/best[ext=mp4]/best" -g "https://www.youtube.com/watch?v=${videoId}"`, (error, stdout, stderr) => {
+    // Кодек не ограничиваем. h264, vp9 и av01 проверены на этом Electron
+    // и играют вплоть до 2160p, поэтому берём лучшее, что есть.
+    exec(`"${ytdlpPath}" -f "bestvideo+bestaudio/best" -g "https://www.youtube.com/watch?v=${videoId}"`, (error, stdout, stderr) => {
       if (error) {
         writeLog(`[YT-DLP] Error: ${stderr}`);
         reject(error);
