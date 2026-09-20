@@ -89,9 +89,9 @@ PureRef не открываются и не разбираются.
 
 ## ✍️ Подпись кода
 
-Релизы подписываются бесплатным сертификатом [SignPath Foundation](https://signpath.org/),
-через [SignPath.io](https://signpath.io/). Как именно собираются, проверяются и
-подписываются сборки — в [Code Signing Policy](CODE_SIGNING_POLICY.md).
+Бесплатная подпись кода предоставлена [SignPath.io](https://about.signpath.io/),
+сертификат выдан [SignPath Foundation](https://signpath.org/). Как собираются,
+проверяются и подписываются сборки — в [Code Signing Policy](CODE_SIGNING_POLICY.md).
 
 ---
 
@@ -192,10 +192,10 @@ files are neither opened nor parsed.
 
 ## ✍️ Code signing
 
-Releases are signed with a free certificate from the
-[SignPath Foundation](https://signpath.org/), through
-[SignPath.io](https://signpath.io/). How builds are produced, reviewed and
-signed is described in the [Code Signing Policy](CODE_SIGNING_POLICY.md).
+Free code signing is provided by [SignPath.io](https://about.signpath.io/),
+with a certificate issued by the [SignPath Foundation](https://signpath.org/).
+How builds are produced, reviewed and signed is described in the
+[Code Signing Policy](CODE_SIGNING_POLICY.md).
 
 ---
 
