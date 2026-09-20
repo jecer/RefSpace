@@ -2016,119 +2016,12 @@ async function doPaste(clipboardDataOverride, isMenuPaste = false) {
   if (clipboardDataOverride && clipboardDataOverride.items) {
     for (let i = 0; i < clipboardDataOverride.items.length; i++) {
       if (clipboardDataOverride.items[i].type.indexOf('image') !== -1) {
-        overridePastedFiles.push(clipboardDataOverride.items[i].getAsFile());
+        const f = clipboardDataOverride.items[i].getAsFile();
+        if (f) overridePastedFiles.push(f);
       }
     }
   }
 
-  // --- Поддержка формата PureRef ---
-  try {
-    const prBuf = await refspace.clipboard.readPureRef();
-    if (prBuf && prBuf.length > 0) {
-      const prItems = [];
-      const sig = Buffer.from('004700720061007000680069006300730049006d006100670065004900740065006d', 'hex');
-      let pos = 0;
-      while (true) {
-        pos = prBuf.indexOf(sig, pos);
-        if (pos === -1) break;
-        pos += sig.length;
-
-        if (pos + 4 > prBuf.length) break;
-        const pathLen = prBuf.readUInt32BE(pos);
-        pos += 4;
-        
-        if (pos + pathLen > prBuf.length) break;
-        let pathStr = '';
-        if (pathLen > 0) {
-          for (let i = 0; i < pathLen; i += 2) {
-            pathStr += String.fromCharCode(prBuf.readUInt16BE(pos + i));
-          }
-        }
-        pos += pathLen;
-
-        if (pos + 4 > prBuf.length) break;
-        const nameLen = prBuf.readUInt32BE(pos);
-        pos += 4;
-        
-        if (pos + nameLen > prBuf.length) break;
-        pos += nameLen;
-
-        if (pos + 8 + 48 + 16 > prBuf.length) break;
-        pos += 8; // skip 1st double
-        pos += 48; // skip matrix
-        const dx = prBuf.readDoubleBE(pos); pos += 8;
-        const dy = prBuf.readDoubleBE(pos); pos += 8;
-
-        if (pathStr) {
-          prItems.push({ path: pathStr, x: dx, y: dy });
-        }
-      }
-
-      if (prItems.length > 0) {
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        prItems.forEach(it => {
-          if (it.x < minX) minX = it.x;
-          if (it.x > maxX) maxX = it.x;
-          if (it.y < minY) minY = it.y;
-          if (it.y > maxY) maxY = it.y;
-        });
-        const centerX = minX + (maxX - minX) / 2;
-        const centerY = minY + (maxY - minY) / 2;
-
-        const newCanvasItems = [];
-        (async () => {
-          for (let i = 0; i < prItems.length; i++) {
-            const it = prItems[i];
-            const mouseX = globalMouseX + (it.x - centerX) * scale;
-            const mouseY = globalMouseY + (it.y - centerY) * scale;
-
-            const { item, contentWrap, title } = createItemContainer(mouseX, mouseY, it.path);
-            item.dataset.type = 'image';
-
-            addPendingMedia();
-            const img = document.createElement('img');
-            img.draggable = false;
-            img.dataset.originalPath = it.path;
-            img.onerror = resolvePendingMedia;
-            img.onload = () => {
-              const w = img.naturalWidth;
-              const h = img.naturalHeight;
-              item.style.width = `${w}px`;
-              item.style.height = `${h}px`;
-
-              const currentLeft = parseFloat(item.style.left) || 0;
-              const currentTop = parseFloat(item.style.top) || 0;
-              item.style.left = `${currentLeft - w / 2}px`;
-              item.style.top = `${currentTop - h / 2}px`;
-              resolvePendingMedia();
-
-              newCanvasItems.push(item);
-              if (newCanvasItems.length === prItems.length) {
-                fitItemsToView(newCanvasItems);
-                if (isMenuPaste) {
-                  startPlacementMode(newCanvasItems);
-                }
-              }
-            };
-            if (it.path.startsWith('http://') || it.path.startsWith('https://')) {
-              img.src = it.path;
-            } else {
-              let safePath = it.path.replace(/\\/g, '/');
-              if (!safePath.startsWith('/')) safePath = '/' + safePath;
-              img.src = 'file://' + safePath;
-            }
-            contentWrap.appendChild(img);
-
-            // Отдаем время главному потоку каждые 5 элементов, чтобы UI не зависал
-            if (i % 5 === 4) await new Promise(r => setTimeout(r, 0));
-          }
-        })();
-        return; // Успешно обработали PureRef формат
-      }
-    }
-  } catch (e) {
-    console.error('PureRef parse failed', e);
-  }
 
   // Сначала пробуем clipboardData (может содержать несколько файлов; уже считано выше, до await)
   const expectedPastedCount = overridePastedFiles.length;
@@ -2579,7 +2472,11 @@ async function doCopy() {
   if (img?.dataset.originalPath) {
     payload.imagePath = img.dataset.originalPath;
   } else if (canvas) {
-    payload.imageDataUrl = canvas.toDataURL('image/png');
+    try {
+      payload.imageDataUrl = canvas.toDataURL('image/png');
+    } catch (e) {
+      console.error('Failed to export canvas for clipboard', e);
+    }
   }
   await refspace.clipboard.writeItems(payload);
 }

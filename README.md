@@ -75,18 +75,6 @@ npm run build
 
 ---
 
-## 📋 О совместимости с PureRef
-
-RefSpace — независимый проект. Он не связан с PureRef, не одобрен его
-разработчиками и не содержит их кода или ресурсов. «PureRef» — товарный знак
-своего владельца.
-
-Приложение умеет принимать элементы, скопированные в буфер обмена из PureRef:
-из данных буфера читаются только пути к файлам изображений. Проектные файлы
-PureRef не открываются и не разбираются.
-
----
-
 ## ✍️ Подпись кода
 
 Сборки пока **не подписаны**, поэтому при первом запуске Windows SmartScreen
@@ -177,18 +165,6 @@ Optionally drop `yt-dlp.exe` into the project root before building. Without it
 the app still runs, but YouTube videos load through a fallback path and less
 reliably. The file is not part of the repository — grab it from the
 [yt-dlp releases page](https://github.com/yt-dlp/yt-dlp/releases).
-
----
-
-## 📋 On PureRef compatibility
-
-RefSpace is an independent project. It is not affiliated with, nor endorsed by,
-PureRef, and contains none of its code or assets. "PureRef" is a trademark of
-its respective owner.
-
-The app can accept items copied to the clipboard from PureRef: only the paths of
-the referenced image files are read from that clipboard data. PureRef project
-files are neither opened nor parsed.
 
 ---
 

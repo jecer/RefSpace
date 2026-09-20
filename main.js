@@ -312,10 +312,6 @@ ipcMain.handle('clipboard:read-image', () => {
   const img = clipboard.readImage();
   return img.isEmpty() ? null : img.toDataURL();
 });
-ipcMain.handle('clipboard:read-pureref', () => {
-  const buf = clipboard.readBuffer('pureref/binary');
-  return buf && buf.length ? buf : null;
-});
 ipcMain.handle('clipboard:write-image', (e, dataUrl) => {
   if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return false;
   clipboard.writeImage(nativeImage.createFromDataURL(dataUrl));

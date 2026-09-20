@@ -33,7 +33,6 @@ window.refspace = {
   clipboard: {
     readText: () => invoke('clipboard:read-text'),
     readImage: () => invoke('clipboard:read-image'),
-    readPureRef: () => invoke('clipboard:read-pureref'),
     writeImage: (dataUrl) => invoke('clipboard:write-image', dataUrl),
     writeItems: (payload) => invoke('clipboard:write-items', payload),
   },
