@@ -644,6 +644,7 @@ function redo() {
 
 function deleteItem(item) {
   if (!item) return;
+  if (item.dataset.locked === '1') return;   // заблокированный не удаляется
   const parent = item.parentNode;
   const nextSibling = item.nextSibling;
 
@@ -745,6 +746,7 @@ function createItemContainer(x, y, path = '') {
 
     handleObj.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return; // Только левая кнопка
+      if (item.dataset.locked === '1') { e.stopPropagation(); return; }
       e.stopPropagation();
       // Если элемент не выделен, сбрасываем всё и выделяем его
       if (!item.classList.contains('selected-item')) {
@@ -1073,6 +1075,7 @@ function createItemContainer(x, y, path = '') {
 
     // Двигаем сразу всю группу выделенных элементов
     document.querySelectorAll('.canvas-item.selected-item').forEach(el => {
+      if (el.dataset.locked === '1') return;   // заблокированный не двигается
       if (el._startMoveLeft !== undefined) {
         el.style.left = `${el._startMoveLeft + deltaX}px`;
         el.style.top = `${el._startMoveTop + deltaY}px`;
@@ -1104,7 +1107,8 @@ function createItemContainer(x, y, path = '') {
     if (isDraggingItem && hasDragged) {
       const movedItems = [];
       document.querySelectorAll('.canvas-item.selected-item').forEach(el => {
-        if (el._startMoveLeft !== undefined) {
+        if (el.dataset.locked === '1') return;   // заблокированный не двигается
+      if (el._startMoveLeft !== undefined) {
           const endLeft = parseFloat(el.style.left) || 0;
           const endTop = parseFloat(el.style.top) || 0;
           const sLeft = el._startMoveLeft;
@@ -3352,6 +3356,7 @@ function readItemLook(el) {
   if (el.dataset.invert === '1') look.invert = 1;
   if (el.dataset.flip === '1') look.flip = 1;
   if (el.dataset.opacity && el.dataset.opacity !== '1') look.opacity = Number(el.dataset.opacity);
+  if (el.dataset.locked === '1') look.locked = 1;
   return Object.keys(look).length ? look : undefined;
 }
 
@@ -3361,10 +3366,38 @@ function writeItemLook(el, look) {
   if (look.invert) el.dataset.invert = '1';
   if (look.flip) el.dataset.flip = '1';
   if (look.opacity) el.dataset.opacity = String(look.opacity);
+  if (look.locked) { el.dataset.locked = '1'; applyLockLook(el); }
   applyItemLook(el);
   // Вызывающий код часто добавляет img или video уже после этого места,
   // поэтому повторяем применение, когда содержимое точно на месте.
   setTimeout(() => applyItemLook(el), 0);
+}
+
+function applyLockLook(el) {
+  const locked = el.dataset.locked === '1';
+  el.style.outline = locked ? '2px dashed rgba(255,255,255,.45)' : '';
+  el.style.outlineOffset = locked ? '2px' : '';
+}
+
+function toggleLock(els) {
+  // Если выделены и запертые, и свободные — запираем все: так предсказуемее.
+  const lockAll = els.some(el => el.dataset.locked !== '1');
+  els.forEach(el => {
+    if (lockAll) el.dataset.locked = '1'; else delete el.dataset.locked;
+    applyLockLook(el);
+  });
+}
+
+function bringToFront(els) {
+  els.forEach(el => { el.style.zIndex = zIndexCounter++; });
+}
+
+function sendToBack(els) {
+  const all = Array.from(document.querySelectorAll('.canvas-item'))
+    .map(el => parseInt(el.style.zIndex, 10) || 0);
+  let min = all.length ? Math.min(...all) : 1;
+  // Ниже единицы не опускаемся: под холстом лежит подложка с zIndex 0.
+  els.forEach(el => { el.style.zIndex = String(Math.max(1, --min)); });
 }
 
 function toggleLook(els, key) {
@@ -3435,6 +3468,17 @@ window.addEventListener('contextmenu', (e) => {
   contextMenu.appendChild(createMenuItem(t('ctx.paste'), () => {
     doPaste(null, false);
   }));
+
+  // Слои и блокировка: имеют смысл для любого элемента, включая оболочки
+  if (selectedItems.length > 0) {
+    const all = Array.from(selectedItems);
+    const anyUnlocked = all.some(el => el.dataset.locked !== '1');
+
+    contextMenu.appendChild(createMenuItem(t('ctx.toFront'), () => bringToFront(all)));
+    contextMenu.appendChild(createMenuItem(t('ctx.toBack'), () => sendToBack(all)));
+    contextMenu.appendChild(createMenuItem(
+      anyUnlocked ? t('ctx.lock') : t('ctx.unlock'), () => toggleLock(all)));
+  }
 
   // Вид: работает для картинок и видео, для оболочек смысла не имеет
   const lookTargets = Array.from(selectedItems)
