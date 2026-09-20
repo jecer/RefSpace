@@ -26,7 +26,7 @@ function createWindow() {
     icon: path.join(__dirname, 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: true, contextIsolation: false, webSecurity: false
+      nodeIntegration: false, contextIsolation: true, webSecurity: false
     }
   });
   mainWindow.webContents.session.setCertificateVerifyProc((r, c) => c(0));
@@ -49,9 +49,6 @@ function registerClickThroughHotkey(hotkey) {
       if (mainWindow) {
         isClickThrough = !isClickThrough;
         mainWindow.setIgnoreMouseEvents(isClickThrough, { forward: true });
-        mainWindow.webContents.send('click-through-changed', isClickThrough);
-        // Transitional: paired send on the new channel name so window.refspace's
-        // onClickThroughChanged works too. Remove the old-name send in Task 5.
         mainWindow.webContents.send('window:click-through-changed', isClickThrough);
       }
     });
@@ -80,9 +77,6 @@ if (!gotTheLock) {
       // Find if they opened a new file
       const arg = commandLine.find(a => a.endsWith('.mpref'));
       if (arg) {
-        mainWindow.webContents.send('open-project-file', arg);
-        // Transitional: paired send on the new channel name so window.refspace's
-        // onOpenProjectFile works too. Remove the old-name send in Task 5.
         mainWindow.webContents.send('project:open-file', arg);
       }
     }
@@ -96,11 +90,6 @@ if (!gotTheLock) {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
-});
-
-ipcMain.on('log-to-file', (e, m) => writeLog(`[RENDERER] ${m}`));
-ipcMain.on('update-click-through-hotkey', (e, hotkey) => {
-  if (hotkey) registerClickThroughHotkey(hotkey);
 });
 
 // Извлечено из старого fetch-video-info, чтобы им пользовались оба канала (старый и media:resolve-youtube)
@@ -133,42 +122,6 @@ function resolveYouTubeStreams(videoId) {
 }
 
 // Мощный загрузчик через yt-dlp или https
-ipcMain.handle('fetch-video-info', async (e, { url, method = 'GET', body = null }) => {
-  writeLog(`[MAIN] Requesting: ${url}`);
-
-  // Если это запрос к YouTube (прямой или через наш фейковый домен), используем yt-dlp
-  const isYouTube = url.includes('local.ytdlp') || url.includes('googlevideo.com') || url.includes('youtube.com');
-  const videoIdMatch = url.match(/\/([a-zA-Z0-9_-]{11})/);
-
-  if (isYouTube && videoIdMatch) {
-    const streams = await resolveYouTubeStreams(videoIdMatch[1]);
-    if (streams) return streams;
-  }
-
-  // Обычный HTTPS загрузчик для зеркал (если yt-dlp нет)
-  const https = require('https');
-  const urlObj = new URL(url);
-  return new Promise((resolve, reject) => {
-    const options = {
-      method, hostname: urlObj.hostname, path: urlObj.pathname + urlObj.search,
-      rejectUnauthorized: false,
-      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' }
-    };
-    const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', (c) => data += c);
-      res.on('end', () => {
-        writeLog(`[MAIN] Fetch completed for ${urlObj.hostname}. Status: ${res.statusCode}`);
-        resolve(data);
-      });
-    });
-    req.on('error', (err) => {
-      writeLog(`[MAIN] Fetch ERROR for ${urlObj.hostname}: ${err.message}`);
-      reject(err);
-    });
-    req.end();
-  });
-});
 
 async function saveProjectToDisk(data, existingPath, dialogTitle) {
   let filePath = existingPath;
@@ -198,9 +151,6 @@ async function saveProjectToDisk(data, existingPath, dialogTitle) {
   return { success: false, cancelled: true };
 }
 
-ipcMain.handle('save-project', (event, data, existingPath, dialogTitle) =>
-  saveProjectToDisk(data, existingPath, dialogTitle));
-
 async function openProjectDialog(dialogTitle) {
   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
     title: dialogTitle || 'Открыть проект RefSpace',
@@ -224,8 +174,6 @@ async function openProjectDialog(dialogTitle) {
   return { success: false, cancelled: true };
 }
 
-ipcMain.handle('open-project', (event, dialogTitle) => openProjectDialog(dialogTitle));
-
 async function readProjectFile(filePath) {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
@@ -235,34 +183,6 @@ async function readProjectFile(filePath) {
     return { success: false, error: err.message };
   }
 }
-
-ipcMain.handle('open-project-from-path', (event, filePath) => readProjectFile(filePath));
-
-ipcMain.handle('get-startup-file', () => startupFilePath);
-
-ipcMain.handle('check-file-exists', (event, filePath) => {
-  if (!filePath) return false;
-  // Заменяем слэши для Windows и убираем лишние кавычки
-  const cleanPath = filePath.replace(/\\/g, '/').replace(/^"|"$/g, '');
-  const exists = fs.existsSync(cleanPath);
-  console.log(`[FILE CHECK] Path: ${cleanPath} | Exists: ${exists}`);
-  return exists;
-});
-
-// Window controls
-ipcMain.on('set-opacity', (e, o) => mainWindow && mainWindow.setOpacity(parseFloat(o)));
-ipcMain.on('set-always-on-top', (e, t) => mainWindow && mainWindow.setAlwaysOnTop(t));
-ipcMain.on('window-minimize', () => mainWindow && mainWindow.minimize());
-ipcMain.on('window-maximize', () => {
-  if (mainWindow.isMaximized()) mainWindow.unmaximize(); else mainWindow.maximize();
-});
-ipcMain.on('window-close', () => mainWindow && mainWindow.close());
-ipcMain.on('set-click-through', (e, clickThrough) => {
-  if (mainWindow) {
-    isClickThrough = clickThrough;
-    mainWindow.setIgnoreMouseEvents(isClickThrough, { forward: true });
-  }
-});
 
 // --- Каналы для preload-моста ---
 ipcMain.on('log', (e, m) => writeLog(`[RENDERER] ${String(m)}`));

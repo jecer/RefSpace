@@ -88,6 +88,8 @@ function evaluate(wsUrl, expression) {
     console.log(JSON.stringify(state, null, 2));
 
     // Утверждения. По мере выполнения задач часть из них ужесточается.
+    state.hasRequire === 'undefined' ? pass('require недоступен') : fail('require всё ещё есть: ' + state.hasRequire);
+    state.hasRefspace === 'object' ? pass('window.refspace на месте') : fail('window.refspace отсутствует');
     state.mp4box !== 'undefined' ? pass('mp4box загружен') : fail('mp4box недоступен');
     state.fonts === 'loaded' ? pass('шрифты загружены') : fail('шрифты: ' + state.fonts);
     state.external.every(u => u.startsWith('https://www.youtube.com'))

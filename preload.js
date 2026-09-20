@@ -1,14 +1,11 @@
-const { ipcRenderer, webUtils } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
 const send = (channel, ...args) => ipcRenderer.send(channel, ...args);
 
-// contextIsolation is off (see main.js webPreferences), so preload shares the
-// page's window object directly — contextBridge.exposeInMainWorld would throw
-// ("contextBridge API can only be used when contextIsolation is enabled").
-// A plain assignment is the correct substitute for this configuration; revisit
-// this when a later task turns contextIsolation on.
-window.refspace = {
+// contextIsolation is on, so the API must cross the bridge: assigning to
+// window here would only touch the isolated world the page cannot see.
+contextBridge.exposeInMainWorld('refspace', {
   project: {
     save: (data, existingPath, dialogTitle) =>
       invoke('project:save', data, existingPath, dialogTitle),
@@ -41,4 +38,4 @@ window.refspace = {
     resolveYouTube: (videoId) => invoke('media:resolve-youtube', videoId),
   },
   log: (message) => send('log', message),
-};
+});
