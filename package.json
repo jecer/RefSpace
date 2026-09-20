@@ -1,0 +1,55 @@
+{
+  "name": "refspace",
+  "version": "1.0.0",
+  "description": "A professional infinite canvas for references, supporting images, videos, and interactive connections.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "bondarenko.cg",
+  "license": "GPL-3.0-or-later",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^41.5.0",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.refspace.app",
+    "files": [
+      "main.js",
+      "renderer.js",
+      "i18n.js",
+      "index.html",
+      "style.css",
+      "icon.png",
+      "vendor/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      "yt-dlp.exe"
+    ],
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "win": {
+      "icon": "icon.png"
+    },
+    "fileAssociations": [
+      {
+        "ext": "mpref",
+        "name": "RefSpace Project",
+        "role": "Editor",
+        "icon": "icon.png"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jecer/RefSpace.git"
+  },
+  "homepage": "https://github.com/jecer/RefSpace"
+}

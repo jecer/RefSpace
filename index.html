@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>RefSpace</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="vendor/fonts/inter.css" rel="stylesheet">
+</head>
+<body>
+  <!-- Кастомная шапка окна (frameless drag) -->
+  <div class="titlebar">
+    <div class="titlebar-left">
+      <div class="titlebar-title">RefSpace</div>
+      <div class="top-menus">
+        <div class="top-menu-item">
+          <div class="top-menu-label" data-i18n="menu.file">Файл</div>
+          <div class="top-menu-dropdown">
+            <div class="dropdown-row" id="tm-open" data-i18n="menu.openProject">Открыть проект</div>
+            <div class="dropdown-row" id="tm-close-proj" data-i18n="menu.closeProject">Закрыть проект</div>
+            <div class="dropdown-row" id="tm-save" data-i18n="menu.save">Сохранить</div>
+            <div class="dropdown-row" id="tm-exit" data-i18n="menu.exit">Закрыть программу</div>
+          </div>
+        </div>
+        <div class="top-menu-item">
+          <div class="top-menu-label" data-i18n="menu.edit">Правка</div>
+          <div class="top-menu-dropdown">
+            <div class="dropdown-row" id="tm-copy" data-i18n="menu.copy">Копировать</div>
+            <div class="dropdown-row" id="tm-paste" data-i18n="menu.paste">Вставить</div>
+            <div class="dropdown-row" id="tm-undo" data-i18n="menu.undo">Отменить</div>
+            <div class="dropdown-row" id="tm-redo" data-i18n="menu.redo">Повторить</div>
+          </div>
+        </div>
+        <div class="top-menu-item">
+          <div class="top-menu-label" data-i18n="menu.help">Справка</div>
+          <div class="top-menu-dropdown">
+            <div class="dropdown-row" id="tm-about" data-i18n="menu.about">О программе</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="titlebar-controls">
+      <button id="btn-minimize">_</button>
+      <button id="btn-maximize">◻</button>
+      <button id="btn-close">✕</button>
+    </div>
+  </div>
+
+  <!-- Плавающая панель управления -->
+  <div class="control-panel" id="controlPanel">
+    <div class="panel-header">
+      <span data-i18n="panel.settings">Настройки</span>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <select id="lang-selector" style="background: #2c2c2c; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 11px; padding: 2px; outline: none;">
+          <option value="ru">RU</option>
+          <option value="en">EN</option>
+          <option value="es">ES</option>
+          <option value="de">DE</option>
+          <option value="fr">FR</option>
+          <option value="zh">中文</option>
+          <option value="ja">日本語</option>
+        </select>
+        <button id="burger-menu-btn" class="burger-menu" title="Свернуть/Развернуть">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    
+    <div class="control-group">
+      <label for="opacity-slider" data-i18n="panel.opacity">Прозрачность</label>
+      <input type="range" id="opacity-slider" min="0.1" max="1.0" step="0.05" value="1.0">
+    </div>
+    
+    <div class="control-group checkbox-group">
+      <input type="checkbox" id="always-on-top">
+      <label for="always-on-top" data-i18n="panel.alwaysOnTop">Поверх всех окон</label>
+    </div>
+
+    <div class="control-group checkbox-group">
+      <input type="checkbox" id="click-through">
+      <label for="click-through" class="highlight-label" data-i18n="panel.clickThrough">Сквозь программу</label>
+    </div>
+    <div class="control-group" style="margin-top: 5px;">
+      <label style="font-size: 11px;" data-i18n="panel.disableKey">Клавиша отключения:</label>
+      <input type="text" id="click-through-hotkey" value="F4" readonly style="width: 100%; text-align: center; cursor: pointer; padding: 4px; font-size: 12px; background: #2c2c2c; color: #e0e0e0; border: 1px solid #444; border-radius: 4px;" title="Кликните, чтобы задать новую клавишу">
+    </div>
+    <div class="hint-text" id="click-through-hint" style="margin-top: 5px;" data-i18n="panel.disableHint">Нажмите <b>F4</b>, чтобы отключить этот режим.</div>
+    
+    <div class="divider"></div>
+
+    <div class="control-group project-buttons">
+      <button id="save-project-btn" class="btn-primary" data-i18n="panel.btnSave">Сохранить проект</button>
+      <button id="open-project-btn" class="btn-secondary" data-i18n="panel.btnOpen">Открыть проект</button>
+    </div>
+    
+    <div class="divider"></div>
+    
+    <div class="control-group">
+      <label data-i18n="panel.addYoutube">Добавить YouTube</label>
+      <div class="input-row">
+        <input type="text" id="youtube-url" placeholder="Ссылка на YouTube..." data-i18n="panel.youtubePlaceholder">
+        <button id="add-youtube-btn">+</button>
+      </div>
+    </div>
+    
+    <div class="hint-text center-hint" data-i18n="panel.dragDropHint">Перетаскивайте (Drag & Drop) картинки и видео файлы прямо сюда.</div>
+  </div>
+
+  <!-- Бесконечный холст -->
+  <div id="canvas-container">
+    <div id="canvas">
+      <!-- SVG-слой для соединительных линий -->
+      <svg id="connections-svg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:99999;">
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" fill="#fff">
+            <polygon points="0 0, 10 3.5, 0 7" />
+          </marker>
+        </defs>
+      </svg>
+      <!-- Сюда будут добавляться элементы (картинки, видео, youtube) -->
+    </div>
+  </div>
+
+  <!-- Библиотека для мгновенного чтения FPS из локальных MP4 без запуска воспроизведения -->
+  <script src="vendor/mp4box.all.min.js"></script>
+  <script src="i18n.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

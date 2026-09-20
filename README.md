@@ -4,6 +4,7 @@
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Electron](https://img.shields.io/badge/built%20with-Electron-47848F.svg)
+![License](https://img.shields.io/badge/license-GPL--3.0-green.svg)
 
 **RefSpace** — это мощный инструмент для художников, дизайнеров и режиссеров монтажа, позволяющий организовать визуальное рабочее пространство без ограничений. В отличие от аналогов, RefSpace полностью поддерживает видеофайлы и YouTube-плееры, позволяя создавать живые мудборды. Поскольку приложение распространяется в виде готового `.exe` файла, вам не нужно ничего собирать — просто запустите программу и начните творить!
 
@@ -55,6 +56,50 @@
 | **Ctrl + Scroll** | Масштабирование холста (Zoom) |
 
 ---
+
+## 🔨 Сборка из исходников
+
+Нужны [Node.js](https://nodejs.org/) 20 или новее и Windows.
+
+```bash
+npm install
+npm run build
+```
+
+Установщик появится в папке `dist/`. Запустить без сборки — `npm start`.
+
+Опционально положите `yt-dlp.exe` в корень проекта перед сборкой. Без него
+приложение работает, но видео с YouTube грузятся по резервному пути и менее
+надёжно. В репозиторий файл не входит, скачать его можно на
+[странице релизов yt-dlp](https://github.com/yt-dlp/yt-dlp/releases).
+
+---
+
+## 📋 О совместимости с PureRef
+
+RefSpace — независимый проект. Он не связан с PureRef, не одобрен его
+разработчиками и не содержит их кода или ресурсов. «PureRef» — товарный знак
+своего владельца.
+
+Приложение умеет принимать элементы, скопированные в буфер обмена из PureRef:
+из данных буфера читаются только пути к файлам изображений. Проектные файлы
+PureRef не открываются и не разбираются.
+
+---
+
+## 📄 Лицензия
+
+[GNU General Public License v3.0 или новее](LICENSE).
+
+Программой можно свободно пользоваться, изучать и изменять её код. Но если вы
+распространяете изменённую версию, её исходный код тоже обязан быть открыт под
+GPL-3.0.
+
+Сторонние компоненты: [mp4box.js](https://github.com/gpac/mp4box.js) под
+BSD-3-Clause и шрифт [Inter](https://github.com/rsms/inter) под SIL OFL 1.1,
+подробности в папке `vendor/`.
+
+
 # 🇬🇧 English Version
 
 # 🎨 RefSpace
@@ -105,4 +150,45 @@
 | **Space + Drag** | Pan the canvas (also middle mouse button) |
 | **Ctrl + Scroll** | Zoom the canvas |
 
+---
 
+## 🔨 Building from source
+
+Requires [Node.js](https://nodejs.org/) 20 or newer, on Windows.
+
+```bash
+npm install
+npm run build
+```
+
+The installer lands in `dist/`. To run without building, use `npm start`.
+
+Optionally drop `yt-dlp.exe` into the project root before building. Without it
+the app still runs, but YouTube videos load through a fallback path and less
+reliably. The file is not part of the repository — grab it from the
+[yt-dlp releases page](https://github.com/yt-dlp/yt-dlp/releases).
+
+---
+
+## 📋 On PureRef compatibility
+
+RefSpace is an independent project. It is not affiliated with, nor endorsed by,
+PureRef, and contains none of its code or assets. "PureRef" is a trademark of
+its respective owner.
+
+The app can accept items copied to the clipboard from PureRef: only the paths of
+the referenced image files are read from that clipboard data. PureRef project
+files are neither opened nor parsed.
+
+---
+
+## 📄 License
+
+[GNU General Public License v3.0 or later](LICENSE).
+
+You are free to use the program, study it and modify it. If you distribute a
+modified version, its source code must be open under GPL-3.0 as well.
+
+Third-party components: [mp4box.js](https://github.com/gpac/mp4box.js) under
+BSD-3-Clause and the [Inter](https://github.com/rsms/inter) typeface under
+SIL OFL 1.1 — see the `vendor/` folder.

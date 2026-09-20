@@ -1,0 +1,672 @@
+:root {
+  --bg-color: #121212;
+  --panel-bg: rgba(30, 30, 30, 0.75);
+  --panel-border: rgba(255, 255, 255, 0.1);
+  --text-color: #E0E0E0;
+  --accent: #6C5CE7;
+  --accent-hover: #8072eb;
+  --danger: #FF7675;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: transparent;
+  color: var(--text-color);
+  overflow: hidden; /* Hide scrollbars, we use pan/zoom */
+  user-select: none;
+}
+
+/* Эффект прозрачности для всего body (чтобы сквозь него было видно, если opacity снижена в Electron, но мы также сделаем сам body полупрозрачным) */
+html, body {
+  width: 100vw;
+  height: 100vh;
+  background: #121212; /* Полностью непрозрачный фон */
+}
+
+/* --- TITLEBAR --- */
+.titlebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 32px;
+  background: rgba(15, 15, 15, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-app-region: drag; /* Позволяет перетаскивать окно */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 1000;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.titlebar-left {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.titlebar-title {
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  color: #aaa;
+  border-right: 1px solid rgba(255,255,255,0.1);
+  margin-right: 8px;
+}
+
+.top-menus {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+
+.top-menu-item {
+  position: relative;
+  height: 100%;
+}
+
+.top-menu-label {
+  padding: 0 12px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: #ccc;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.top-menu-label:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.top-menu-dropdown {
+  position: absolute;
+  top: 32px;
+  left: 0;
+  background: #2c2c2c;
+  border: 1px solid #444;
+  border-radius: 0 0 6px 6px;
+  min-width: 160px;
+  display: none;
+  flex-direction: column;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  z-index: 10000;
+  padding: 4px 0;
+}
+
+.top-menu-item.active .top-menu-dropdown {
+  display: flex;
+}
+
+.dropdown-row {
+  padding: 6px 16px;
+  font-size: 13px;
+  color: #e0e0e0;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.dropdown-row:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.titlebar-controls {
+  -webkit-app-region: no-drag; /* Кнопки не должны таскать окно */
+  display: flex;
+  height: 100%;
+}
+
+.titlebar-controls button {
+  background: transparent;
+  border: none;
+  color: #aaa;
+  width: 40px;
+  height: 100%;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.titlebar-controls button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+#btn-close:hover {
+  background: var(--danger);
+}
+
+/* --- CONTROL PANEL --- */
+.control-panel {
+  position: fixed;
+  top: 50px;
+  right: 20px;
+  width: 280px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 16px;
+  z-index: 900;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  -webkit-app-region: no-drag;
+}
+
+.panel-header {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--panel-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.burger-menu {
+  background: transparent;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.burger-menu:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.control-panel.collapsed > *:not(.panel-header) {
+  display: none !important;
+}
+
+.control-panel.collapsed .panel-header {
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.control-group {
+  margin-bottom: 14px;
+}
+
+.control-group label {
+  display: block;
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 6px;
+}
+
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.checkbox-group label {
+  margin-bottom: 0;
+  margin-left: 8px;
+  font-size: 13px;
+  color: #ddd;
+  cursor: pointer;
+}
+
+.checkbox-group input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.highlight-label {
+  color: var(--danger) !important;
+  font-weight: 600;
+}
+
+.hint-text {
+  font-size: 11px;
+  color: #888;
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+
+.center-hint {
+  text-align: center;
+  margin-top: 16px;
+  margin-bottom: 0;
+  font-style: italic;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.divider {
+  height: 1px;
+  background: var(--panel-border);
+  margin: 16px 0;
+}
+
+.input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.input-row input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: #fff;
+  padding: 6px 10px;
+  font-size: 13px;
+  outline: none;
+}
+
+.input-row input:focus {
+  border-color: var(--accent);
+}
+
+.input-row button {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  width: 32px;
+  font-size: 18px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.input-row button:hover {
+  background: var(--accent-hover);
+}
+
+.project-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.project-buttons button {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid var(--panel-border) !important;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* --- CANVAS & ITEMS --- */
+#canvas-container {
+  position: absolute;
+  top: 32px; /* Ниже titlebar */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  z-index: 10;
+}
+
+#canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-origin: 0 0; /* Важно для зума */
+}
+
+/* Элемент на холсте (картинка/видео) */
+.canvas-item {
+  position: absolute;
+  background: transparent;
+  padding: 0;
+  resize: none;
+  overflow: visible;
+  border: 2px solid transparent;
+  will-change: width, height, left, top;
+  transform: translateZ(0); /* Аппаратное ускорение, чтобы убрать артефакты при ресайзе */
+}
+
+.canvas-item.selected-item {
+  /* border-color: rgba(255, 255, 255, 0.6); - Убрано, чтобы использовать независимую от зума рамку */
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Точки изменения размера (только диагонали) */
+.resize-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 4px rgba(0,0,0,0.8);
+  display: none;
+  z-index: 20;
+  transform: scale(var(--inv-scale, 1));
+}
+
+.canvas-item.selected-item .resize-handle {
+  display: block;
+}
+
+.resize-nw { top: -4px; left: -4px; cursor: nw-resize; }
+.resize-ne { top: -4px; right: -4px; cursor: ne-resize; }
+.resize-se { bottom: -4px; right: -4px; cursor: se-resize; }
+.resize-sw { bottom: -4px; left: -4px; cursor: sw-resize; }
+
+/* Точки-коннекторы для вытягивания линий */
+.connector-point {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #6C5CE7;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  display: none;
+  z-index: 21;
+  cursor: crosshair;
+  transition: transform 0.15s, background 0.15s;
+  transform: scale(var(--inv-scale, 1));
+}
+
+.connector-point:hover {
+  transform: scale(calc(var(--inv-scale, 1) * 1.4));
+  background: #8072eb;
+}
+
+.canvas-item.selected-item .connector-point {
+  display: block;
+}
+
+.connector-top    { top: -15px; left: calc(50% - 4px); }
+.connector-bottom { bottom: -15px; left: calc(50% - 4px); }
+.connector-left   { left: -15px; top: calc(50% - 4px); }
+.connector-right  { right: -15px; top: calc(50% - 4px); }
+
+/* Ручка для перемещения (скрываем) */
+.drag-handle {
+  display: none;
+}
+
+.btn-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  color: #fff;
+  background: var(--danger);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 10;
+}
+
+.canvas-item.selected-item .btn-remove {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.btn-remove:hover {
+  background: #ff4d4d;
+}
+
+/* Контент внутри айтема */
+.item-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.item-content img, .item-content video, .item-content iframe {
+  width: 100%;
+  height: 100%;
+  object-fit: fill; /* Теперь картинка растягивается по рамке */
+  pointer-events: auto;
+}
+
+/* Маркеры для видео (панель снизу) */
+.video-markers-panel {
+  position: absolute;
+  top: calc(100% + 4px); /* Сразу под видео */
+  left: 0;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.75);
+  border-radius: 4px;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  box-sizing: border-box;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 15;
+}
+
+.canvas-item.selected-item .video-markers-panel {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.video-buttons-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.video-buttons-row button {
+  flex: 1;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.video-buttons-row button:hover {
+  background: var(--accent-hover);
+}
+
+.markers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.marker-row {
+  display: flex;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 6px;
+  border-radius: 2px;
+  font-size: 11px;
+}
+
+.marker-col.time-col {
+  font-weight: bold;
+  color: #a8d5ff;
+}
+
+.marker-empty {
+  font-size: 11px;
+  color: #bbb;
+  text-align: center;
+  padding: 2px 0;
+}
+
+.btn-marker-del {
+  background: transparent;
+  color: #ff6b6b;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-marker-del:hover {
+  background: rgba(255, 107, 107, 0.2);
+}
+
+/* --- Стили для группы (оболочки) --- */
+.group-box {
+  background: rgba(30, 30, 30, 0.4);
+  border: 2px dashed rgba(255, 255, 255, 0.4) !important;
+  border-radius: 8px;
+  box-shadow: none !important;
+  overflow: visible;
+}
+
+.group-box .drag-handle {
+  display: flex !important;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px 6px 0 0;
+  cursor: grab;
+  overflow: hidden;
+}
+
+.group-box .btn-remove {
+  position: static;
+  opacity: 1;
+  pointer-events: auto;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+}
+
+.group-box-title {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.group-box-title::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.group-box .item-content {
+  display: none;
+}
+
+/* --- Соединительные линии --- */
+.connection-path {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.6);
+  stroke-width: 2;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.connection-path:hover {
+  stroke: #6C5CE7;
+  stroke-width: 3;
+}
+
+.connection-path.selected-connection {
+  stroke: #6C5CE7;
+  stroke-width: 3;
+}
+
+.control-point {
+  fill: #6C5CE7;
+  stroke: white;
+  stroke-width: 2;
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.control-point:hover {
+  fill: #8072eb;
+  r: 7;
+}
+
+.connection-hint {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  z-index: 10000;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+/* Рамка выделения */
+.selection-box {
+  position: fixed;
+  border: 1px solid rgba(108, 92, 231, 0.8);
+  background: rgba(108, 92, 231, 0.2);
+  pointer-events: none;
+  z-index: 100000;
+}
