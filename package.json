@@ -18,6 +18,8 @@
   },
   "build": {
     "appId": "com.refspace.app",
+    "productName": "RefSpace",
+    "copyright": "Copyright (c) 2026 bondarenko.cg",
     "files": [
       "main.js",
       "renderer.js",

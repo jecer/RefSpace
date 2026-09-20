@@ -87,6 +87,14 @@ PureRef не открываются и не разбираются.
 
 ---
 
+## ✍️ Подпись кода
+
+Релизы подписываются бесплатным сертификатом [SignPath Foundation](https://signpath.org/),
+через [SignPath.io](https://signpath.io/). Как именно собираются, проверяются и
+подписываются сборки — в [Code Signing Policy](CODE_SIGNING_POLICY.md).
+
+---
+
 ## 📄 Лицензия
 
 [GNU General Public License v3.0 или новее](LICENSE).
@@ -179,6 +187,15 @@ its respective owner.
 The app can accept items copied to the clipboard from PureRef: only the paths of
 the referenced image files are read from that clipboard data. PureRef project
 files are neither opened nor parsed.
+
+---
+
+## ✍️ Code signing
+
+Releases are signed with a free certificate from the
+[SignPath Foundation](https://signpath.org/), through
+[SignPath.io](https://signpath.io/). How builds are produced, reviewed and
+signed is described in the [Code Signing Policy](CODE_SIGNING_POLICY.md).
 
 ---
 
