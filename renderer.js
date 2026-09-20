@@ -1719,12 +1719,16 @@ function addYouTubeVideo(videoId) {
 
     try {
       // Специальный запрос, который main.js перехватит и обработает через yt-dlp
-      const rawData = await refspace.media.resolveYouTube(id);
-
-      const data = JSON.parse(rawData);
-      if (data && data.videoStreams && data.videoStreams[0].url) {
+      // Возвращаются токены, а не адреса: поток идёт через главный процесс,
+      // с того же происхождения, что и страница, иначе снять кадр нельзя.
+      const tokens = await refspace.media.resolveYouTube(id);
+      if (tokens && tokens.videoToken) {
         flog(`[SUCCESS] Streams obtained via yt-dlp`);
-        return { video: data.videoStreams[0].url, audio: data.audioStreams?.[0]?.url || data.videoStreams[0].url };
+        const at = tokens.audioToken || tokens.videoToken;
+        return {
+          video: `refspace://app/_stream/${tokens.videoToken}`,
+          audio: `refspace://app/_stream/${at}`
+        };
       }
     } catch (e) {
       flog(`[ERROR] yt-dlp failed: ${e.message}`);
@@ -3119,12 +3123,11 @@ async function fetchYouTubeStreamForElement(videoId, videoElement, containerItem
   containerItem._cleanupSync = () => clearInterval(driftCheck);
 
   try {
-    const rawData = await refspace.media.resolveYouTube(videoId);
-    const data = JSON.parse(rawData);
-    if (data && data.videoStreams && data.videoStreams[0].url) {
+    const tokens = await refspace.media.resolveYouTube(videoId);
+    if (tokens && tokens.videoToken) {
       statusMsg.style.display = 'none';
-      videoElement.src = data.videoStreams[0].url;
-      audioElement.src = data.audioStreams?.[0]?.url || data.videoStreams[0].url;
+      videoElement.src = `refspace://app/_stream/${tokens.videoToken}`;
+      audioElement.src = `refspace://app/_stream/${tokens.audioToken || tokens.videoToken}`;
       setupMarkerLogic(containerItem, {
         seekTo: (s) => {
           videoElement.currentTime = s;

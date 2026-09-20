@@ -15,6 +15,7 @@ const fs = require('fs');
 
 const APP_ROOT = __dirname;
 const localFiles = new Map();   // token -> absolute path
+const streams = new Map();      // token -> remote stream url
 
 function registerScheme() {
   protocol.registerSchemesAsPrivileged([{
@@ -33,8 +34,44 @@ function registerLocalFile(absPath) {
   return token;
 }
 
+// Токен выдаётся только на адрес, который главный процесс разрешил сам через
+// yt-dlp. Проверка хоста обязательна: без неё приложение превратится в
+// открытый прокси на произвольный адрес по просьбе рендерера.
+function registerStream(url) {
+  if (typeof url !== 'string') return null;
+  if (!/^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.googlevideo\.com\//i.test(url)) return null;
+  for (const [token, u] of streams) if (u === url) return token;
+  const token = crypto.randomBytes(16).toString('hex');
+  streams.set(token, url);
+  return token;
+}
+
 function clearRegistry() {
   localFiles.clear();
+  streams.clear();
+}
+
+// Проксирует удалённый поток. Range пробрасывается вверх и статус источника
+// возвращается как есть — без этого медиа-элемент не сможет перематывать.
+async function serveStream(remoteUrl, rangeHeader) {
+  const headers = new Headers();
+  if (rangeHeader) headers.set('Range', rangeHeader);
+
+  let upstream;
+  try {
+    upstream = await net.fetch(remoteUrl, { headers });
+  } catch (err) {
+    return new Response('upstream failed: ' + err.message, { status: 502 });
+  }
+
+  const out = new Headers();
+  for (const name of ['content-type', 'content-length', 'content-range', 'accept-ranges']) {
+    const value = upstream.headers.get(name);
+    if (value) out.set(name, value);
+  }
+  if (!out.has('accept-ranges')) out.set('accept-ranges', 'bytes');
+
+  return new Response(upstream.body, { status: upstream.status, headers: out });
 }
 
 // Отдаёт файл с диска с поддержкой Range. Без неё не работает перемотка
@@ -124,6 +161,13 @@ function installHandler() {
 
     const range = request.headers.get('Range');
 
+    if (url.pathname.startsWith('/_stream/')) {
+      const token = decodeURIComponent(url.pathname.slice('/_stream/'.length));
+      const remote = streams.get(token);
+      if (!remote) return new Response('unknown token', { status: 404 });
+      return serveStream(remote, range);
+    }
+
     if (url.pathname.startsWith('/_media/')) {
       const token = decodeURIComponent(url.pathname.slice('/_media/'.length));
       const filePath = localFiles.get(token);
@@ -142,4 +186,6 @@ function installHandler() {
   });
 }
 
-module.exports = { registerScheme, installHandler, registerLocalFile, clearRegistry };
+module.exports = {
+  registerScheme, installHandler, registerLocalFile, registerStream, clearRegistry
+};

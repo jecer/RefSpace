@@ -117,10 +117,12 @@ function resolveYouTubeStreams(videoId) {
         const videoUrl = lines[0];
         const audioUrl = lines[1] || videoUrl; // Если аудио нет отдельно, используем ту же ссылку
         writeLog(`[YT-DLP] Success: Found streams (Video: ${!!videoUrl}, Audio: ${!!audioUrl})`);
-        resolve(JSON.stringify({
-          videoStreams: [{ url: videoUrl }],
-          audioStreams: [{ url: audioUrl }]
-        }));
+        // Рендереру отдаются токены, а не адреса googlevideo: сам адрес он
+        // не видит и передать его обратно не может.
+        resolve({
+          videoToken: appProtocol.registerStream(videoUrl),
+          audioToken: appProtocol.registerStream(audioUrl)
+        });
       }
     });
   });
