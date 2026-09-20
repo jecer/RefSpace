@@ -1909,6 +1909,7 @@ async function doPaste(clipboardDataOverride, isMenuPaste = false) {
 
           const { item, contentWrap, title } = createItemContainer(screenX, screenY, itemData.path || '');
           item.dataset.type = itemData.type;
+          writeItemLook(item, itemData.look);
           item.style.width = itemData.width;
           item.style.height = itemData.height;
           title.textContent = itemData.title;
@@ -2439,6 +2440,7 @@ async function doCopy() {
       itemData.groupColor = getComputedStyle(el).backgroundColor;
     }
 
+    itemData.look = readItemLook(el);
     internalClipboard.push(itemData);
   });
 
@@ -2470,7 +2472,8 @@ async function doCopy() {
     // Подсвечиваем первый элемент, если это не картинка
     const el = selectedItems[0];
     el.style.opacity = '0.5';
-    setTimeout(() => el.style.opacity = '1', 200);
+    // Возвращаем вид элемента, а не единицу: у него может быть своя прозрачность.
+    setTimeout(() => applyItemLook(el), 200);
   }
 
   const payload = { text: JSON.stringify({ myPureRefSignature: 'mpref1', items: internalClipboard }) };
@@ -2743,6 +2746,7 @@ function getProjectData(skipImageData = false) {
       itemData.groupColor = bg;
     }
 
+    itemData.look = readItemLook(el);
     projectData.items.push(itemData);
   });
 
@@ -2923,6 +2927,7 @@ async function openProject(filePath = null) {
           const { item, contentWrap, title } = createItemContainer(0, 0, itemData.path || '');
           item.dataset.id = itemData.id;
           item.dataset.type = itemData.type;
+          writeItemLook(item, itemData.look);
           item.style.left = itemData.left;
           item.style.top = itemData.top;
           item.style.width = itemData.width;
@@ -3322,6 +3327,70 @@ contextMenu.style.fontSize = '14px';
 contextMenu.style.minWidth = '150px';
 document.body.appendChild(contextMenu);
 
+// Вид элемента: обесцвечивание, инверсия, отражение и прозрачность.
+// Хранится в data-атрибутах самого элемента, чтобы сохранение, копирование
+// и открытие проекта работали с ним единообразно.
+function applyItemLook(el) {
+  if (!el) return;
+  // Цель — обёртка содержимого, а не сам img: при открытии проекта картинка
+  // создаётся позже, а обёртка существует с самого начала. Отражение на ней
+  // переворачивает только содержимое, не задевая шапку с заголовком.
+  const target = el.querySelector('.item-content') || el.querySelector('img, video');
+  if (target) {
+    const f = [];
+    if (el.dataset.gray === '1') f.push('grayscale(1)');
+    if (el.dataset.invert === '1') f.push('invert(1)');
+    target.style.filter = f.join(' ');
+    target.style.transform = el.dataset.flip === '1' ? 'scaleX(-1)' : '';
+  }
+  el.style.opacity = el.dataset.opacity || '1';
+}
+
+function readItemLook(el) {
+  const look = {};
+  if (el.dataset.gray === '1') look.gray = 1;
+  if (el.dataset.invert === '1') look.invert = 1;
+  if (el.dataset.flip === '1') look.flip = 1;
+  if (el.dataset.opacity && el.dataset.opacity !== '1') look.opacity = Number(el.dataset.opacity);
+  return Object.keys(look).length ? look : undefined;
+}
+
+function writeItemLook(el, look) {
+  if (!look) return;
+  if (look.gray) el.dataset.gray = '1';
+  if (look.invert) el.dataset.invert = '1';
+  if (look.flip) el.dataset.flip = '1';
+  if (look.opacity) el.dataset.opacity = String(look.opacity);
+  applyItemLook(el);
+  // Вызывающий код часто добавляет img или video уже после этого места,
+  // поэтому повторяем применение, когда содержимое точно на месте.
+  setTimeout(() => applyItemLook(el), 0);
+}
+
+function toggleLook(els, key) {
+  els.forEach(el => {
+    el.dataset[key] = el.dataset[key] === '1' ? '0' : '1';
+    applyItemLook(el);
+  });
+}
+
+function stepOpacity(els, delta) {
+  els.forEach(el => {
+    const cur = Number(el.dataset.opacity || 1);
+    const next = Math.min(1, Math.max(0.15, Math.round((cur + delta) * 100) / 100));
+    el.dataset.opacity = String(next);
+    applyItemLook(el);
+  });
+}
+
+function resetLook(els) {
+  els.forEach(el => {
+    delete el.dataset.gray; delete el.dataset.invert;
+    delete el.dataset.flip; delete el.dataset.opacity;
+    applyItemLook(el);
+  });
+}
+
 function hideContextMenu() {
   contextMenu.style.display = 'none';
 }
@@ -3366,6 +3435,27 @@ window.addEventListener('contextmenu', (e) => {
   contextMenu.appendChild(createMenuItem(t('ctx.paste'), () => {
     doPaste(null, false);
   }));
+
+  // Вид: работает для картинок и видео, для оболочек смысла не имеет
+  const lookTargets = Array.from(selectedItems)
+    .filter(el => el.dataset.type === 'image' || el.dataset.type === 'video');
+
+  if (lookTargets.length > 0) {
+    const sep = document.createElement('div');
+    sep.style.cssText = 'height:1px;background:rgba(255,255,255,.12);margin:5px 0;';
+    contextMenu.appendChild(sep);
+
+    contextMenu.appendChild(createMenuItem(t('ctx.grayscale'), () => toggleLook(lookTargets, 'gray')));
+    contextMenu.appendChild(createMenuItem(t('ctx.invert'), () => toggleLook(lookTargets, 'invert')));
+    contextMenu.appendChild(createMenuItem(t('ctx.flip'), () => toggleLook(lookTargets, 'flip')));
+    contextMenu.appendChild(createMenuItem(t('ctx.fadeOut'), () => stepOpacity(lookTargets, -0.15)));
+    contextMenu.appendChild(createMenuItem(t('ctx.fadeIn'), () => stepOpacity(lookTargets, 0.15)));
+    contextMenu.appendChild(createMenuItem(t('ctx.resetLook'), () => resetLook(lookTargets)));
+
+    const sep2 = document.createElement('div');
+    sep2.style.cssText = 'height:1px;background:rgba(255,255,255,.12);margin:5px 0;';
+    contextMenu.appendChild(sep2);
+  }
 
   // Создать оболочку
   if (selectedItems.length > 0) {
