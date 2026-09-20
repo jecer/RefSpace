@@ -37,9 +37,25 @@ function registerLocalFile(absPath) {
 // Токен выдаётся только на адрес, который главный процесс разрешил сам через
 // yt-dlp. Проверка хоста обязательна: без неё приложение превратится в
 // открытый прокси на произвольный адрес по просьбе рендерера.
-function registerStream(url) {
+// allowSuffix расширяет список разрешённых хостов на время одного вызова:
+// зеркало Piped может отдать ссылку на собственный прокси, а не на googlevideo.
+// Расширение задаёт главный процесс, исходя из того, к какому зеркалу он сам
+// обратился, — рендерер на этот список влиять не может.
+function registerStream(url, allowSuffix) {
   if (typeof url !== 'string') return null;
-  if (!/^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.googlevideo\.com\//i.test(url)) return null;
+  let host;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'https:') return null;
+    host = u.hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+  const allowed =
+    host === 'googlevideo.com' || host.endsWith('.googlevideo.com') ||
+    (typeof allowSuffix === 'string' && allowSuffix &&
+      (host === allowSuffix || host.endsWith('.' + allowSuffix)));
+  if (!allowed) return null;
   for (const [token, u] of streams) if (u === url) return token;
   const token = crypto.randomBytes(16).toString('hex');
   streams.set(token, url);

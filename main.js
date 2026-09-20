@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, dialog, clipboard, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, dialog, clipboard, nativeImage, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
@@ -94,8 +94,57 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// Извлечено из старого fetch-video-info, чтобы им пользовались оба канала (старый и media:resolve-youtube)
-function resolveYouTubeStreams(videoId) {
+// Зеркала Piped запрашивают YouTube у себя на сервере и отдают готовые ссылки
+// на потоки. Это резерв на случай, когда yt-dlp не может сам добраться до
+// youtube.com — например, когда провайдер не резолвит его имя. Тогда DNS
+// пользователя для метаданных не нужен вовсе.
+const PIPED_MIRRORS = [
+  { api: 'https://pipedapi.kavin.rocks', domain: 'kavin.rocks' },
+  { api: 'https://api.piped.victr.me', domain: 'victr.me' },
+  { api: 'https://pipedapi.adminforge.de', domain: 'adminforge.de' },
+  { api: 'https://api.piped.private.coffee', domain: 'private.coffee' }
+];
+
+async function resolveViaPiped(videoId) {
+  for (const mirror of PIPED_MIRRORS) {
+    try {
+      const res = await net.fetch(`${mirror.api}/streams/${videoId}`);
+      if (!res.ok) { writeLog(`[PIPED] ${mirror.api}: HTTP ${res.status}`); continue; }
+      const data = await res.json();
+      if (!data || !Array.isArray(data.videoStreams)) continue;
+
+      // Нужен слитый поток: в нём есть и картинка, и звук, и это H.264,
+      // который Electron умеет проигрывать.
+      const v = data.videoStreams.find(s => !s.videoOnly) || data.videoStreams[0];
+      const a = (data.audioStreams && data.audioStreams[0]) || v;
+      if (!v || !v.url) continue;
+
+      const videoToken = appProtocol.registerStream(v.url, mirror.domain);
+      if (!videoToken) { writeLog(`[PIPED] ${mirror.api}: недопустимый хост потока`); continue; }
+      writeLog(`[PIPED] Success via ${mirror.api}`);
+      return {
+        videoToken,
+        audioToken: appProtocol.registerStream(a.url || v.url, mirror.domain) || videoToken
+      };
+    } catch (err) {
+      writeLog(`[PIPED] ${mirror.api}: ${err.message}`);
+    }
+  }
+  return null;
+}
+
+async function resolveYouTubeStreams(videoId) {
+  try {
+    const direct = await resolveViaYtdlp(videoId);
+    if (direct) return direct;
+    writeLog('[MAIN] yt-dlp недоступен, пробуем зеркала Piped');
+  } catch (err) {
+    writeLog(`[MAIN] yt-dlp не справился (${String(err.message).split('\n')[0]}), пробуем зеркала Piped`);
+  }
+  return resolveViaPiped(videoId);
+}
+
+function resolveViaYtdlp(videoId) {
   const ytdlpPath = app.isPackaged
     ? path.join(process.resourcesPath, 'yt-dlp.exe')
     : path.join(__dirname, 'yt-dlp.exe');
@@ -115,12 +164,20 @@ function resolveYouTubeStreams(videoId) {
         const lines = stdout.trim().split('\n');
         const videoUrl = lines[0];
         const audioUrl = lines[1] || videoUrl; // Если аудио нет отдельно, используем ту же ссылку
-        writeLog(`[YT-DLP] Success: Found streams (Video: ${!!videoUrl}, Audio: ${!!audioUrl})`);
         // Рендереру отдаются токены, а не адреса googlevideo: сам адрес он
         // не видит и передать его обратно не может.
+        const videoToken = appProtocol.registerStream(videoUrl);
+        if (!videoToken) {
+          // Ссылка есть, но хост не тот, что мы готовы отдавать. Пусть решает
+          // резерв, а не пустой ответ рендереру.
+          writeLog('[YT-DLP] Ссылка получена, но хост не разрешён');
+          resolve(null);
+          return;
+        }
+        writeLog(`[YT-DLP] Success: Found streams (Video: ${!!videoUrl}, Audio: ${!!audioUrl})`);
         resolve({
-          videoToken: appProtocol.registerStream(videoUrl),
-          audioToken: appProtocol.registerStream(audioUrl)
+          videoToken,
+          audioToken: appProtocol.registerStream(audioUrl) || videoToken
         });
       }
     });
