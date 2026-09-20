@@ -192,9 +192,16 @@ function resolveViaYtdlp(videoId) {
     // не поднялся, идём напрямую — хуже, чем было, не станет.
     const viaProxy = dohProxy.url() ? `--proxy "${dohProxy.url()}" ` : '';
 
-    // Кодек не ограничиваем. h264, vp9 и av01 проверены на этом Electron
-    // и играют вплоть до 2160p, поэтому берём лучшее, что есть.
-    exec(`"${ytdlpPath}" ${viaProxy}-f "bestvideo+bestaudio/best" -g "https://www.youtube.com/watch?v=${videoId}"`, (error, stdout, stderr) => {
+    // Кодек не ограничиваем: h264, vp9 и av01 проверены на этом Electron и
+    // играют вплоть до 2160p. А вот протокол ограничиваем — для шортсов
+    // yt-dlp выбирает HLS, и тогда -g отдаёт ссылку на m3u8-плейлист.
+    // Chromium вне Safari нативно HLS не проигрывает: элемент скачивает
+    // текстовый плейлист и падает с DEMUXER_ERROR_COULD_NOT_PARSE.
+    // Сегментные протоколы отсеиваем, прогрессивные https остаются.
+    const noSegments = '[protocol!*=m3u8][protocol!*=dash]';
+    const format = `bestvideo${noSegments}+bestaudio${noSegments}/best${noSegments}/best`;
+
+    exec(`"${ytdlpPath}" ${viaProxy}-f "${format}" -g "https://www.youtube.com/watch?v=${videoId}"`, (error, stdout, stderr) => {
       if (error) {
         writeLog(`[YT-DLP] Error: ${stderr}`);
         reject(error);

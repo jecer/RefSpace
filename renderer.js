@@ -1693,6 +1693,32 @@ function addYouTubeVideo(videoId) {
   video.controls = true;
   video.style.background = '#000';
   video.style.objectFit = 'contain';
+
+  // Размер 480x270 выставлен вслепую, до того как известны пропорции ролика.
+  // Для вертикальных (шортсы) он даёт узкую полоску в чёрных полях, поэтому
+  // подгоняем рамку под кадр, как это уже делают локальные видеофайлы.
+  video.addEventListener('loadedmetadata', () => {
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh || item._autoSized) return;
+    item._autoSized = true;
+
+    // Отталкиваемся от текущей рамки, а не от константы: начальный размер
+    // задаётся в двух местах, и привязка к числу уже один раз промахнулась.
+    const oldW = parseFloat(item.style.width) || 640;
+    const oldH = parseFloat(item.style.height) || 360;
+    const longSide = Math.max(oldW, oldH);
+
+    const w = vw >= vh ? longSide : Math.round(longSide * (vw / vh));
+    const h = vw >= vh ? Math.round(longSide * (vh / vw)) : longSide;
+
+    // Сдвигаем на половину изменения, чтобы ролик остался там же, где был.
+    item.style.left = `${(parseFloat(item.style.left) || 0) - (w - oldW) / 2}px`;
+    item.style.top = `${(parseFloat(item.style.top) || 0) - (h - oldH) / 2}px`;
+    item.style.width = `${w}px`;
+    item.style.height = `${h}px`;
+  }, { once: true });
+
   contentWrap.appendChild(video);
 
   const audio = document.createElement('audio');
