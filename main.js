@@ -30,15 +30,12 @@ function createWindow() {
     icon: path.join(__dirname, 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      nodeIntegration: false, contextIsolation: true, webSecurity: false
+      nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true
     }
   });
-  mainWindow.webContents.session.setCertificateVerifyProc((r, c) => c(0));
   mainWindow.loadURL('refspace://app/index.html');
 }
 
-app.commandLine.appendSwitch('ignore-certificate-errors');
-app.commandLine.appendSwitch('no-sandbox');
 app.commandLine.appendSwitch('disable-features', 'PostQuantumKyber');
 
 let currentHotkey = 'F4';
@@ -127,8 +124,6 @@ function resolveYouTubeStreams(videoId) {
     });
   });
 }
-
-// Мощный загрузчик через yt-dlp или https
 
 async function saveProjectToDisk(data, existingPath, dialogTitle) {
   let filePath = existingPath;
