@@ -104,8 +104,10 @@ function resolveYouTubeStreams(videoId) {
 
   writeLog(`[MAIN] Using yt-dlp for video: ${videoId}`);
   return new Promise((resolve, reject) => {
-    // Запрашиваем лучший видео поток и лучший аудио поток отдельно для макс. качества (1080p+)
-    exec(`"${ytdlpPath}" -f "bestvideo+bestaudio/best" -g "https://www.youtube.com/watch?v=${videoId}"`, (error, stdout, stderr) => {
+    // Формат ограничен H.264 и AAC намеренно. bestvideo отдаёт AV1 с Opus в
+    // 2160p, а Electron их не декодирует — вместо картинки получается серый
+    // проигрыватель. avc1+mp4a играет везде, ценой потолка в 1080p.
+    exec(`"${ytdlpPath}" -f "bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/best[vcodec^=avc1]/best[ext=mp4]/best" -g "https://www.youtube.com/watch?v=${videoId}"`, (error, stdout, stderr) => {
       if (error) {
         writeLog(`[YT-DLP] Error: ${stderr}`);
         reject(error);

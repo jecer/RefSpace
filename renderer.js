@@ -2448,13 +2448,16 @@ async function doCopy() {
     img = firstImgItem.querySelector('img');
     if (img) {
       try {
-        if (!img.dataset.originalPath) {
-          canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0);
-        }
+        // Холст строится всегда, а не только когда нет пути к файлу.
+        // nativeImage читает с диска лишь PNG и JPEG, поэтому для webp, avif,
+        // bmp и прочего картинка в буфере выходила пустой и вставлялся
+        // только служебный текст. Через холст получается PNG из чего угодно,
+        // что браузер сумел показать.
+        canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
 
         img.style.opacity = '0.5';
         setTimeout(() => img.style.opacity = '1', 200);
@@ -2470,14 +2473,17 @@ async function doCopy() {
   }
 
   const payload = { text: JSON.stringify({ myPureRefSignature: 'mpref1', items: internalClipboard }) };
-  if (img?.dataset.originalPath) {
-    payload.imagePath = img.dataset.originalPath;
-  } else if (canvas) {
+  if (canvas) {
     try {
       payload.imageDataUrl = canvas.toDataURL('image/png');
     } catch (e) {
       console.error('Failed to export canvas for clipboard', e);
     }
+  }
+  // Путь остаётся запасным вариантом: если холст не удался, пусть система
+  // попробует прочитать файл сама.
+  if (!payload.imageDataUrl && img?.dataset.originalPath) {
+    payload.imagePath = img.dataset.originalPath;
   }
   await refspace.clipboard.writeItems(payload);
 }

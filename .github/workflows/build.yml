@@ -12,8 +12,8 @@ on:
 # kept in this repository, so the build fetches it and refuses to continue
 # unless it matches the checksum published with that upstream release.
 env:
-  YTDLP_VERSION: '2026.03.17'
-  YTDLP_SHA256: '3db811b366b2da47337d2fcfdfe5bbd9a258dad3f350c54974f005df115a1545'
+  YTDLP_VERSION: '2026.08.19'
+  YTDLP_SHA256: '66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a'
 
 jobs:
   build:
