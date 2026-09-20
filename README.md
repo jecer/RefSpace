@@ -68,9 +68,9 @@ npm run build
 
 Установщик появится в папке `dist/`. Запустить без сборки — `npm start`.
 
-Опционально положите `yt-dlp.exe` в корень проекта перед сборкой. Без него
-приложение работает, но видео с YouTube грузятся по резервному пути и менее
-надёжно. В репозиторий файл не входит, скачать его можно на
+Для работы с YouTube положите `yt-dlp.exe` в корень проекта перед сборкой.
+Без него приложение запускается и всё остальное работает, но ролики с YouTube
+не откроются. В репозиторий файл не входит, скачать его можно на
 [странице релизов yt-dlp](https://github.com/yt-dlp/yt-dlp/releases).
 
 ---
@@ -161,9 +161,9 @@ npm run build
 
 The installer lands in `dist/`. To run without building, use `npm start`.
 
-Optionally drop `yt-dlp.exe` into the project root before building. Without it
-the app still runs, but YouTube videos load through a fallback path and less
-reliably. The file is not part of the repository — grab it from the
+For YouTube support, drop `yt-dlp.exe` into the project root before building.
+Without it the app starts and everything else works, but YouTube clips will not
+open. The file is not part of the repository — grab it from the
 [yt-dlp releases page](https://github.com/yt-dlp/yt-dlp/releases).
 
 ---

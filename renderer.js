@@ -1648,7 +1648,7 @@ function updateMarkerInfo(markers, listElement, playIntervalCallback) {
 
 // Функция логирования в файл через IPC
 function flog(msg) {
-  if (window.ipcRenderer) {
+  if (window.refspace) {
     refspace.log(msg);
   }
 }
@@ -1751,7 +1751,7 @@ function addYouTubeVideo(videoId) {
         pauseVideo: () => { video.pause(); audio.pause(); }
       }, true);
     } else {
-      flog('[FAIL] FAILED to get stream URL from all mirrors');
+      flog('[FAIL] FAILED to get stream URL');
       statusMsg.textContent = 'ОШИБКА: НЕТ ССЫЛКИ';
       statusMsg.style.color = 'red';
     }
@@ -2031,9 +2031,7 @@ async function doPaste(clipboardDataOverride, isMenuPaste = false) {
       let offsetStep = 0;
       let pastedItems = [];
       for (let i = 0; i < overridePastedFiles.length; i++) {
-        if (overridePastedFiles[i].type.indexOf('image') !== -1) {
           const blob = overridePastedFiles[i];
-          if (!blob) continue;
           const url = URL.createObjectURL(blob);
           const mouseX = globalMouseX + (offsetStep * 30 * scale);
           const mouseY = globalMouseY + (offsetStep * 30 * scale);
@@ -2070,7 +2068,6 @@ async function doPaste(clipboardDataOverride, isMenuPaste = false) {
           contentWrap.appendChild(img);
 
           if (offsetStep % 5 === 0) await new Promise(r => setTimeout(r, 0));
-        }
       }
     })();
     return;
