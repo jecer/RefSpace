@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, dialog, clipboard, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
@@ -25,6 +25,7 @@ function createWindow() {
     backgroundColor: '#00000000',
     icon: path.join(__dirname, 'icon.png'),
     webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true, contextIsolation: false, webSecurity: false
     }
   });
@@ -49,6 +50,9 @@ function registerClickThroughHotkey(hotkey) {
         isClickThrough = !isClickThrough;
         mainWindow.setIgnoreMouseEvents(isClickThrough, { forward: true });
         mainWindow.webContents.send('click-through-changed', isClickThrough);
+        // Transitional: paired send on the new channel name so window.refspace's
+        // onClickThroughChanged works too. Remove the old-name send in Task 5.
+        mainWindow.webContents.send('window:click-through-changed', isClickThrough);
       }
     });
   } catch (err) {
@@ -77,6 +81,9 @@ if (!gotTheLock) {
       const arg = commandLine.find(a => a.endsWith('.mpref'));
       if (arg) {
         mainWindow.webContents.send('open-project-file', arg);
+        // Transitional: paired send on the new channel name so window.refspace's
+        // onOpenProjectFile works too. Remove the old-name send in Task 5.
+        mainWindow.webContents.send('project:open-file', arg);
       }
     }
   });
@@ -96,6 +103,35 @@ ipcMain.on('update-click-through-hotkey', (e, hotkey) => {
   if (hotkey) registerClickThroughHotkey(hotkey);
 });
 
+// Извлечено из старого fetch-video-info, чтобы им пользовались оба канала (старый и media:resolve-youtube)
+function resolveYouTubeStreams(videoId) {
+  const ytdlpPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'yt-dlp.exe')
+    : path.join(__dirname, 'yt-dlp.exe');
+
+  if (!fs.existsSync(ytdlpPath)) return null;
+
+  writeLog(`[MAIN] Using yt-dlp for video: ${videoId}`);
+  return new Promise((resolve, reject) => {
+    // Запрашиваем лучший видео поток и лучший аудио поток отдельно для макс. качества (1080p+)
+    exec(`"${ytdlpPath}" -f "bestvideo+bestaudio/best" -g "https://www.youtube.com/watch?v=${videoId}"`, (error, stdout, stderr) => {
+      if (error) {
+        writeLog(`[YT-DLP] Error: ${stderr}`);
+        reject(error);
+      } else {
+        const lines = stdout.trim().split('\n');
+        const videoUrl = lines[0];
+        const audioUrl = lines[1] || videoUrl; // Если аудио нет отдельно, используем ту же ссылку
+        writeLog(`[YT-DLP] Success: Found streams (Video: ${!!videoUrl}, Audio: ${!!audioUrl})`);
+        resolve(JSON.stringify({
+          videoStreams: [{ url: videoUrl }],
+          audioStreams: [{ url: audioUrl }]
+        }));
+      }
+    });
+  });
+}
+
 // Мощный загрузчик через yt-dlp или https
 ipcMain.handle('fetch-video-info', async (e, { url, method = 'GET', body = null }) => {
   writeLog(`[MAIN] Requesting: ${url}`);
@@ -105,32 +141,8 @@ ipcMain.handle('fetch-video-info', async (e, { url, method = 'GET', body = null 
   const videoIdMatch = url.match(/\/([a-zA-Z0-9_-]{11})/);
 
   if (isYouTube && videoIdMatch) {
-    const videoId = videoIdMatch[1];
-    const ytdlpPath = app.isPackaged 
-      ? path.join(process.resourcesPath, 'yt-dlp.exe')
-      : path.join(__dirname, 'yt-dlp.exe');
-
-    if (fs.existsSync(ytdlpPath)) {
-      writeLog(`[MAIN] Using yt-dlp for video: ${videoId}`);
-      return new Promise((resolve, reject) => {
-        // Запрашиваем лучший видео поток и лучший аудио поток отдельно для макс. качества (1080p+)
-        exec(`"${ytdlpPath}" -f "bestvideo+bestaudio/best" -g "https://www.youtube.com/watch?v=${videoId}"`, (error, stdout, stderr) => {
-          if (error) {
-            writeLog(`[YT-DLP] Error: ${stderr}`);
-            reject(error);
-          } else {
-            const lines = stdout.trim().split('\n');
-            const videoUrl = lines[0];
-            const audioUrl = lines[1] || videoUrl; // Если аудио нет отдельно, используем ту же ссылку
-            writeLog(`[YT-DLP] Success: Found streams (Video: ${!!videoUrl}, Audio: ${!!audioUrl})`);
-            resolve(JSON.stringify({
-              videoStreams: [{ url: videoUrl }],
-              audioStreams: [{ url: audioUrl }]
-            }));
-          }
-        });
-      });
-    }
+    const streams = await resolveYouTubeStreams(videoIdMatch[1]);
+    if (streams) return streams;
   }
 
   // Обычный HTTPS загрузчик для зеркал (если yt-dlp нет)
@@ -158,7 +170,7 @@ ipcMain.handle('fetch-video-info', async (e, { url, method = 'GET', body = null 
   });
 });
 
-ipcMain.handle('save-project', async (event, data, existingPath, dialogTitle) => {
+async function saveProjectToDisk(data, existingPath, dialogTitle) {
   let filePath = existingPath;
 
   if (!filePath) {
@@ -184,9 +196,12 @@ ipcMain.handle('save-project', async (event, data, existingPath, dialogTitle) =>
     }
   }
   return { success: false, cancelled: true };
-});
+}
 
-ipcMain.handle('open-project', async (event, dialogTitle) => {
+ipcMain.handle('save-project', (event, data, existingPath, dialogTitle) =>
+  saveProjectToDisk(data, existingPath, dialogTitle));
+
+async function openProjectDialog(dialogTitle) {
   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
     title: dialogTitle || 'Открыть проект RefSpace',
     filters: [
@@ -207,9 +222,11 @@ ipcMain.handle('open-project', async (event, dialogTitle) => {
     }
   }
   return { success: false, cancelled: true };
-});
+}
 
-ipcMain.handle('open-project-from-path', async (event, filePath) => {
+ipcMain.handle('open-project', (event, dialogTitle) => openProjectDialog(dialogTitle));
+
+async function readProjectFile(filePath) {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
     return { success: true, data: JSON.parse(content), filePath };
@@ -217,7 +234,9 @@ ipcMain.handle('open-project-from-path', async (event, filePath) => {
     writeLog(`[OPEN ERROR] ${err.message}`);
     return { success: false, error: err.message };
   }
-});
+}
+
+ipcMain.handle('open-project-from-path', (event, filePath) => readProjectFile(filePath));
 
 ipcMain.handle('get-startup-file', () => startupFilePath);
 
@@ -243,4 +262,73 @@ ipcMain.on('set-click-through', (e, clickThrough) => {
     isClickThrough = clickThrough;
     mainWindow.setIgnoreMouseEvents(isClickThrough, { forward: true });
   }
+});
+
+// --- Каналы для preload-моста ---
+ipcMain.on('log', (e, m) => writeLog(`[RENDERER] ${String(m)}`));
+ipcMain.on('window:minimize', () => mainWindow && mainWindow.minimize());
+ipcMain.on('window:maximize', () => {
+  if (!mainWindow) return;
+  if (mainWindow.isMaximized()) mainWindow.unmaximize(); else mainWindow.maximize();
+});
+ipcMain.on('window:close', () => mainWindow && mainWindow.close());
+ipcMain.on('window:set-opacity', (e, value) => {
+  const v = Number(value);
+  if (mainWindow && Number.isFinite(v)) mainWindow.setOpacity(Math.min(1, Math.max(0.1, v)));
+});
+ipcMain.on('window:set-always-on-top', (e, flag) => {
+  if (mainWindow) mainWindow.setAlwaysOnTop(Boolean(flag));
+});
+ipcMain.on('window:set-click-through', (e, flag) => {
+  if (!mainWindow) return;
+  isClickThrough = Boolean(flag);
+  mainWindow.setIgnoreMouseEvents(isClickThrough, { forward: true });
+});
+ipcMain.on('window:set-hotkey', (e, key) => {
+  if (typeof key === 'string' && key.length > 0 && key.length < 32) {
+    registerClickThroughHotkey(key);
+  }
+});
+
+ipcMain.handle('project:save', (e, data, existingPath, title) =>
+  saveProjectToDisk(data, existingPath, title));
+ipcMain.handle('project:open', (e, title) => openProjectDialog(title));
+ipcMain.handle('project:open-path', (e, filePath) => readProjectFile(filePath));
+ipcMain.handle('project:startup-file', () => startupFilePath);
+ipcMain.handle('project:file-exists', (e, filePath) => {
+  if (typeof filePath !== 'string' || !filePath) return false;
+  return fs.existsSync(filePath.replace(/\\/g, '/').replace(/^"|"$/g, ''));
+});
+
+ipcMain.handle('media:resolve-youtube', (e, videoId) => {
+  if (!/^[a-zA-Z0-9_-]{11}$/.test(String(videoId))) {
+    throw new Error('invalid video id');
+  }
+  return resolveYouTubeStreams(String(videoId));
+});
+
+ipcMain.handle('clipboard:read-text', () => clipboard.readText());
+ipcMain.handle('clipboard:read-image', () => {
+  const img = clipboard.readImage();
+  return img.isEmpty() ? null : img.toDataURL();
+});
+ipcMain.handle('clipboard:read-pureref', () => {
+  const buf = clipboard.readBuffer('pureref/binary');
+  return buf && buf.length ? buf : null;
+});
+ipcMain.handle('clipboard:write-image', (e, dataUrl) => {
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return false;
+  clipboard.writeImage(nativeImage.createFromDataURL(dataUrl));
+  return true;
+});
+ipcMain.handle('clipboard:write-items', (e, payload) => {
+  const out = {};
+  if (typeof payload?.text === 'string') out.text = payload.text;
+  if (typeof payload?.imageDataUrl === 'string' && payload.imageDataUrl.startsWith('data:image/')) {
+    out.image = nativeImage.createFromDataURL(payload.imageDataUrl);
+  } else if (typeof payload?.imagePath === 'string') {
+    out.image = nativeImage.createFromPath(payload.imagePath);
+  }
+  clipboard.write(out);
+  return true;
 });
