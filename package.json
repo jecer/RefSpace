@@ -1,6 +1,6 @@
 {
   "name": "refspace",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A professional infinite canvas for references, supporting images, videos, and interactive connections.",
   "main": "main.js",
   "scripts": {

@@ -59,7 +59,7 @@ jobs:
           retention-days: 30
 
   release:
-    name: Attach to release
+    name: Publish release
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -67,13 +67,24 @@ jobs:
       contents: write
 
     steps:
+      - name: Check out the source
+        uses: actions/checkout@v4
+
       - name: Download the build output
         uses: actions/download-artifact@v4
         with:
           name: RefSpace-installer
           path: dist
 
-      - name: Upload to the release for this tag
+      - name: Publish the release for this tag
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$GITHUB_REF_NAME" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+        run: |
+          set -euo pipefail
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "RefSpace ${GITHUB_REF_NAME#v}" \
+              --notes-file .github/RELEASE_NOTE.md
+          fi
+          gh release upload "$GITHUB_REF_NAME" dist/* --clobber --repo "$GITHUB_REPOSITORY"

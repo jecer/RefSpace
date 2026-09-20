@@ -4,8 +4,10 @@ This document describes how RefSpace releases are built, reviewed and signed.
 
 ## Signing provider
 
-Free code signing is provided by [SignPath.io](https://signpath.io/), with a
-certificate issued by the [SignPath Foundation](https://signpath.org/).
+Releases are not signed yet. Code signing is being set up through
+[SignPath.io](https://signpath.io/), with a certificate to be issued by the
+[SignPath Foundation](https://signpath.org/). This document describes the
+process that signing will run under.
 
 ## Team roles
 

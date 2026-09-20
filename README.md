@@ -2,7 +2,7 @@
 # 🎨 RefSpace
 > Профессиональный бесконечный холст для работы с референсами, поддерживающий изображения, видео и интерактивные связи.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
 ![Electron](https://img.shields.io/badge/built%20with-Electron-47848F.svg)
 ![License](https://img.shields.io/badge/license-GPL--3.0-green.svg)
 
@@ -89,9 +89,11 @@ PureRef не открываются и не разбираются.
 
 ## ✍️ Подпись кода
 
-Бесплатная подпись кода предоставлена [SignPath.io](https://about.signpath.io/),
-сертификат выдан [SignPath Foundation](https://signpath.org/). Как собираются,
-проверяются и подписываются сборки — в [Code Signing Policy](CODE_SIGNING_POLICY.md).
+Сборки пока **не подписаны**, поэтому при первом запуске Windows SmartScreen
+покажет предупреждение о неизвестном издателе. Подпись настраивается через
+[SignPath.io](https://about.signpath.io/), сертификат — от
+[SignPath Foundation](https://signpath.org/). Как собираются, проверяются и
+подписываются сборки — в [Code Signing Policy](CODE_SIGNING_POLICY.md).
 
 ---
 
@@ -192,10 +194,11 @@ files are neither opened nor parsed.
 
 ## ✍️ Code signing
 
-Free code signing is provided by [SignPath.io](https://about.signpath.io/),
-with a certificate issued by the [SignPath Foundation](https://signpath.org/).
-How builds are produced, reviewed and signed is described in the
-[Code Signing Policy](CODE_SIGNING_POLICY.md).
+Builds are **not signed yet**, so Windows SmartScreen warns about an unknown
+publisher on first run. Code signing is being set up through
+[SignPath.io](https://about.signpath.io/), with a certificate from the
+[SignPath Foundation](https://signpath.org/). How builds are produced, reviewed
+and signed is described in the [Code Signing Policy](CODE_SIGNING_POLICY.md).
 
 ---
 
