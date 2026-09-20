@@ -184,6 +184,26 @@ function resolveViaYtdlp(videoId) {
   });
 }
 
+// Рендерер отмечает картинки, у которых цел исходный файл. Здесь его байты
+// вшиваются в проект как есть — тогда .mpref остаётся одним самодостаточным
+// файлом, которым можно поделиться, но не раздувается перекодированием.
+function embedOriginals(data) {
+  if (!data || !Array.isArray(data.items)) return;
+  for (const item of data.items) {
+    if (!item.embedFrom) continue;
+    const src = item.embedFrom;
+    delete item.embedFrom;
+    try {
+      const bytes = fs.readFileSync(src);
+      item.data = 'data:' + appProtocol.contentType(src) + ';base64,' + bytes.toString('base64');
+    } catch (err) {
+      // Файл пропал или недоступен. Элемент сохранится без картинки, но
+      // проект не потеряется целиком из-за одного файла.
+      writeLog(`[SAVE] Не удалось вшить ${src}: ${err.message}`);
+    }
+  }
+}
+
 async function saveProjectToDisk(data, existingPath, dialogTitle) {
   let filePath = existingPath;
 
@@ -202,7 +222,9 @@ async function saveProjectToDisk(data, existingPath, dialogTitle) {
 
   if (filePath) {
     try {
-      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+      embedOriginals(data);
+      // Без отступов: файл почти целиком состоит из base64, форматировать нечего.
+      fs.writeFileSync(filePath, JSON.stringify(data), 'utf-8');
       return { success: true, filePath };
     } catch (err) {
       writeLog(`[SAVE ERROR] ${err.message}`);

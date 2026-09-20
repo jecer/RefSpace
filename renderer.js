@@ -2709,6 +2709,11 @@ function getProjectData(skipImageData = false) {
           try {
             if (img.src.startsWith('data:')) {
               itemData.data = img.src;
+            } else if (itemPath) {
+              // Исходный файл на месте — пусть главный процесс вошьёт его байты
+              // как есть. Перекодирование фотографии в PNG раздувает её в разы
+              // и при этом ничего не добавляет: JPEG уже сжат как надо.
+              itemData.embedFrom = itemPath;
             } else {
               if (!el._cachedData) {
                 const canvas = document.createElement('canvas');

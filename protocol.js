@@ -203,5 +203,6 @@ function installHandler() {
 }
 
 module.exports = {
-  registerScheme, installHandler, registerLocalFile, registerStream, clearRegistry
+  registerScheme, installHandler, registerLocalFile, registerStream, clearRegistry,
+  contentType
 };
