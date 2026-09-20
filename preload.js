@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('refspace', {
   },
   media: {
     pathForDroppedFile: (file) => webUtils.getPathForFile(file),
+    registerLocal: (absPath) => invoke('media:register-local', absPath),
     resolveYouTube: (videoId) => invoke('media:resolve-youtube', videoId),
   },
   log: (message) => send('log', message),

@@ -88,6 +88,7 @@ function evaluate(wsUrl, expression) {
     console.log(JSON.stringify(state, null, 2));
 
     // Утверждения. По мере выполнения задач часть из них ужесточается.
+    state.origin === 'refspace://app' ? pass('происхождение refspace://app') : fail('origin: ' + state.origin);
     state.hasRequire === 'undefined' ? pass('require недоступен') : fail('require всё ещё есть: ' + state.hasRequire);
     state.hasRefspace === 'object' ? pass('window.refspace на месте') : fail('window.refspace отсутствует');
     state.mp4box !== 'undefined' ? pass('mp4box загружен') : fail('mp4box недоступен');

@@ -2,6 +2,10 @@ const { app, BrowserWindow, ipcMain, globalShortcut, dialog, clipboard, nativeIm
 const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
+const appProtocol = require('./protocol');
+
+// registerSchemesAsPrivileged обязан вызываться до app.ready
+appProtocol.registerScheme();
 
 let mainWindow;
 let isClickThrough = false;
@@ -30,7 +34,7 @@ function createWindow() {
     }
   });
   mainWindow.webContents.session.setCertificateVerifyProc((r, c) => c(0));
-  mainWindow.loadFile('index.html');
+  mainWindow.loadURL('refspace://app/index.html');
 }
 
 app.commandLine.appendSwitch('ignore-certificate-errors');
@@ -83,6 +87,7 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
+    appProtocol.installHandler();
     createWindow();
     registerClickThroughHotkey('F4');
   });
@@ -219,6 +224,8 @@ ipcMain.handle('project:file-exists', (e, filePath) => {
   if (typeof filePath !== 'string' || !filePath) return false;
   return fs.existsSync(filePath.replace(/\\/g, '/').replace(/^"|"$/g, ''));
 });
+
+ipcMain.handle('media:register-local', (e, absPath) => appProtocol.registerLocalFile(absPath));
 
 ipcMain.handle('media:resolve-youtube', (e, videoId) => {
   if (!/^[a-zA-Z0-9_-]{11}$/.test(String(videoId))) {

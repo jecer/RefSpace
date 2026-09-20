@@ -2914,15 +2914,16 @@ async function openProject(filePath = null) {
           item.style.zIndex = itemData.zIndex;
           title.textContent = itemData.title;
 
-          // Нормализуем путь: заменяем слэши и кодируем спецсимволы (особенно # и пробелы)
-          const normalizedPath = itemData.path ? itemData.path.replace(/\\/g, '/') : '';
-          const encodedPath = encodeURI(normalizedPath).replace(/#/g, '%23');
+          // Локальный файл адресуется токеном: рендерер не знает путей, а
+          // протокол отдаёт файл с того же происхождения, что и страница,
+          // поэтому чтение пикселей из canvas остаётся возможным.
+          const mediaToken = hasValidPath ? await refspace.media.registerLocal(itemData.path) : null;
+          const mediaUrl = mediaToken ? `refspace://app/_media/${mediaToken}` : '';
 
           if (itemData.type === 'image') {
             const img = document.createElement('img');
             img.draggable = false;
-            // Используем протокол file:/// с кодированным путем
-            img.src = itemData.data || (hasValidPath ? `file:///${encodedPath}` : '');
+            img.src = itemData.data || mediaUrl;
             if (!img.src && !itemData.data) {
               title.textContent += ' (ФАЙЛ ПОТЕРЯН)';
               item.style.background = 'rgba(255,0,0,0.2)';
@@ -2931,7 +2932,7 @@ async function openProject(filePath = null) {
           } else if (itemData.type === 'video') {
             if (hasValidPath) {
               const video = document.createElement('video');
-              video.src = `file:///${encodedPath}`;
+              video.src = mediaUrl;
               video.controls = true;
               video.onerror = () => console.error("Error loading video:", video.src);
               contentWrap.appendChild(video);
