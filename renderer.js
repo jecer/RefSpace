@@ -3269,6 +3269,11 @@ function showAboutModal() {
         <li style="margin-bottom: 4px;">${t('about.feature7')}</li>
       </ul>
 
+      <p style="margin: 0 0 12px 0; color: #fff;"><b>${t('about.toolsTitle')}</b></p>
+      <p style="margin: 0 0 10px 0;">${t('about.tools')}</p>
+      <p style="margin: 0 0 10px 0; color: #aaa;">${t('about.toolsHow')}</p>
+      <p style="margin: 0 0 20px 0; color: #aaa;">${t('about.missing')}</p>
+
       <p style="margin: 0 0 12px 0; color: #fff;"><b>${t('about.hotkeysTitle')}</b></p>
       <ul style="margin: 0 0 24px 20px; padding: 0;">
         <li style="margin-bottom: 4px;">${t('about.hk1')}</li>
