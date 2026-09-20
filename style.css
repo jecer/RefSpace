@@ -344,6 +344,12 @@ input[type="range"] {
   bottom: 0;
   overflow: hidden;
   z-index: 10;
+  /* Точечная сетка. Размер и смещение задаёт updateCanvasTransform, поэтому
+     она бесконечна: едет вместе с холстом и масштабируется вместе с ним. */
+  background-image: radial-gradient(
+    rgba(255, 255, 255, 0.07) var(--dot-r, 1.4px),
+    transparent var(--dot-r, 1.4px)
+  );
 }
 
 #canvas {

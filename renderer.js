@@ -380,6 +380,17 @@ let startY = 0;
 function updateCanvasTransform() {
   canvas.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
   document.documentElement.style.setProperty('--inv-scale', 1 / scale);
+
+  // Точечная сетка живёт на контейнере, а не на холсте: так она покрывает
+  // всё видимое поле независимо от того, куда уехал холст.
+  let step = 34 * scale;
+  // На сильном отдалении точки сливаются в рябь, поэтому period удваиваем,
+  // пока шаг не станет различимым.
+  while (step < 16) step *= 2;
+  const r = Math.max(0.6, Math.min(3, 1.4 * scale));
+  canvasContainer.style.backgroundSize = `${step}px ${step}px`;
+  canvasContainer.style.backgroundPosition = `${translateX}px ${translateY}px`;
+  canvasContainer.style.setProperty('--dot-r', `${r}px`);
 }
 
 function fitItemsToView(items) {
