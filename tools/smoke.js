@@ -20,6 +20,21 @@ const PROBE = `(() => ({
 function fail(msg) { console.error('FAIL ' + msg); process.exitCode = 1; }
 function pass(msg) { console.log('ok   ' + msg); }
 
+// Если порт уже занят, CDP отдаст страницу чужого приложения, и проверки
+// будут выполнены не над тем окном. Лучше отказаться, чем соврать.
+async function assertPortFree() {
+  let taken = false;
+  try {
+    const res = await fetch(`http://127.0.0.1:${PORT}/json`);
+    taken = res.ok;
+  } catch {
+    taken = false; // соединение отклонено — порт свободен
+  }
+  if (taken) {
+    throw new Error(`порт ${PORT} занят другим приложением Electron; освободите его или поменяйте PORT в этом скрипте`);
+  }
+}
+
 async function readyTarget() {
   const deadline = Date.now() + 30000;
   let wsUrl = null;
@@ -27,7 +42,7 @@ async function readyTarget() {
     if (!wsUrl) {
       try {
         const res = await fetch(`http://127.0.0.1:${PORT}/json`);
-        const page = (await res.json()).find(t => t.type === 'page');
+        const page = (await res.json()).find(t => t.type === 'page' && t.url.endsWith('index.html'));
         if (page) wsUrl = page.webSocketDebuggerUrl;
       } catch { /* ещё не поднялось */ }
     }
@@ -62,10 +77,13 @@ function evaluate(wsUrl, expression) {
 }
 
 (async () => {
-  const child = spawn(ELECTRON, ['.', `--remote-debugging-port=${PORT}`], {
-    cwd: path.join(__dirname, '..'), stdio: 'ignore'
-  });
+  let child;
   try {
+    await assertPortFree();
+
+    child = spawn(ELECTRON, ['.', `--remote-debugging-port=${PORT}`], {
+      cwd: path.join(__dirname, '..'), stdio: 'ignore'
+    });
     const state = await evaluate(await readyTarget(), PROBE);
     console.log(JSON.stringify(state, null, 2));
 
@@ -78,6 +96,6 @@ function evaluate(wsUrl, expression) {
   } catch (err) {
     fail(err.message);
   } finally {
-    child.kill();
+    if (child) child.kill();
   }
 })();
