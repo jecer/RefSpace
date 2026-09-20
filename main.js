@@ -25,7 +25,7 @@ function createWindow() {
     backgroundColor: '#00000000',
     icon: path.join(__dirname, 'icon.png'),
     webPreferences: {
-      nodeIntegration: true, contextIsolation: false, webviewTag: true, webSecurity: false
+      nodeIntegration: true, contextIsolation: false, webSecurity: false
     }
   });
   mainWindow.webContents.session.setCertificateVerifyProc((r, c) => c(0));

@@ -1,6 +1,4 @@
 const { ipcRenderer, clipboard, nativeImage, webUtils } = require('electron');
-const fs = require('fs');
-const path = require('path');
 
 // --- Управление окном ---
 document.getElementById('btn-close').addEventListener('click', () => tryCloseApp());
@@ -1650,17 +1648,6 @@ function updateMarkerInfo(markers, listElement, playIntervalCallback) {
   }
 }
 
-// --- Интеграция YouTube ---
-let ytApiLoaded = false;
-window.onYouTubeIframeAPIReady = () => {
-  ytApiLoaded = true;
-};
-
-// Динамическая загрузка API
-const tag = document.createElement('script');
-tag.src = "https://www.youtube.com/iframe_api";
-const firstScriptTag = document.getElementsByTagName('script')[0];
-firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 // Функция логирования в файл через IPC
 function flog(msg) {
   if (window.ipcRenderer) {
