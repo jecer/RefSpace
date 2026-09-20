@@ -1,0 +1,79 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# yt-dlp ships as a prebuilt executable that the installer bundles. It is not
+# kept in this repository, so the build fetches it and refuses to continue
+# unless it matches the checksum published with that upstream release.
+env:
+  YTDLP_VERSION: '2026.03.17'
+  YTDLP_SHA256: '3db811b366b2da47337d2fcfdfe5bbd9a258dad3f350c54974f005df115a1545'
+
+jobs:
+  build:
+    name: Windows installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out the source
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch and verify yt-dlp
+        shell: pwsh
+        run: |
+          $url = "https://github.com/yt-dlp/yt-dlp/releases/download/$env:YTDLP_VERSION/yt-dlp.exe"
+          Invoke-WebRequest -Uri $url -OutFile yt-dlp.exe
+          $actual = (Get-FileHash yt-dlp.exe -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $env:YTDLP_SHA256) {
+            throw "yt-dlp.exe checksum mismatch. Expected $env:YTDLP_SHA256, got $actual"
+          }
+          Write-Host "yt-dlp.exe $env:YTDLP_VERSION verified"
+
+      - name: Build the installer
+        run: npm run build
+
+      - name: Collect the build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: RefSpace-installer
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest.yml
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Attach to release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download the build output
+        uses: actions/download-artifact@v4
+        with:
+          name: RefSpace-installer
+          path: dist
+
+      - name: Upload to the release for this tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/* --clobber --repo "$GITHUB_REPOSITORY"
