@@ -233,7 +233,6 @@ ipcMain.handle('media:resolve-youtube', (e, videoId) => {
   return resolveYouTubeStreams(String(videoId));
 });
 
-ipcMain.handle('clipboard:read-text', () => clipboard.readText());
 ipcMain.handle('clipboard:read-image', () => {
   const img = clipboard.readImage();
   return img.isEmpty() ? null : img.toDataURL();
@@ -243,14 +242,47 @@ ipcMain.handle('clipboard:write-image', (e, dataUrl) => {
   clipboard.writeImage(nativeImage.createFromDataURL(dataUrl));
   return true;
 });
+// Служебное описание скопированных элементов держится здесь, а не в тексте
+// системного буфера. Положить рядом с картинкой собственный формат нельзя:
+// clipboard.write и clipboard.writeBuffer затирают друг друга, это проверено.
+// А класть описание текстом нельзя тем более — сторонние программы вставляли
+// бы JSON вместо картинки.
+let lastCopy = null;   // { json, fingerprint }
+
+function imageFingerprint(image) {
+  if (!image || image.isEmpty()) return null;
+  return require('crypto').createHash('sha1').update(image.toBitmap()).digest('hex');
+}
+
 ipcMain.handle('clipboard:write-items', (e, payload) => {
-  const out = {};
-  if (typeof payload?.text === 'string') out.text = payload.text;
+  const json = typeof payload?.text === 'string' ? payload.text : null;
+
+  let image = null;
   if (typeof payload?.imageDataUrl === 'string' && payload.imageDataUrl.startsWith('data:image/')) {
-    out.image = nativeImage.createFromDataURL(payload.imageDataUrl);
+    image = nativeImage.createFromDataURL(payload.imageDataUrl);
   } else if (typeof payload?.imagePath === 'string') {
-    out.image = nativeImage.createFromPath(payload.imagePath);
+    image = nativeImage.createFromPath(payload.imagePath);
   }
-  clipboard.write(out);
+
+  if (image && !image.isEmpty()) {
+    clipboard.write({ image });
+    lastCopy = { json, fingerprint: imageFingerprint(clipboard.readImage()) };
+  } else {
+    // Копировали то, у чего нет картинки: группу, видео, набор элементов.
+    clipboard.clear();
+    lastCopy = { json, fingerprint: null };
+  }
   return true;
+});
+
+// Описание возвращается только если системный буфер всё ещё содержит ровно то,
+// что мы в него положили. Иначе пользователь успел скопировать что-то другое,
+// и вставлять наши элементы было бы неверно.
+ipcMain.handle('clipboard:read-items', () => {
+  if (!lastCopy || !lastCopy.json) return null;
+  const current = clipboard.readImage();
+  if (lastCopy.fingerprint === null) {
+    return (current.isEmpty() && clipboard.readText() === '') ? lastCopy.json : null;
+  }
+  return imageFingerprint(current) === lastCopy.fingerprint ? lastCopy.json : null;
 });

@@ -1871,14 +1871,26 @@ window.addEventListener('mousedown', (e) => {
 async function doPaste(clipboardDataOverride, isMenuPaste = false) {
   if (document.activeElement && document.activeElement.tagName.toLowerCase() === 'input') return;
 
-  // Читаем текст из буфера обмена (через Electron API)
-  const textData = clipboardDataOverride
-    ? clipboardDataOverride.getData('text')
-    : await refspace.clipboard.readText();
+  // Всё нужное из события вставки читается здесь, до первого await:
+  // после него e.clipboardData опустеет.
+  const overridePastedFiles = [];
+  if (clipboardDataOverride && clipboardDataOverride.items) {
+    for (let i = 0; i < clipboardDataOverride.items.length; i++) {
+      if (clipboardDataOverride.items[i].type.indexOf('image') !== -1) {
+        const f = clipboardDataOverride.items[i].getAsFile();
+        if (f) overridePastedFiles.push(f);
+      }
+    }
+  }
 
-  if (textData && textData.includes('myPureRefSignature')) {
+  // Служебные данные о скопированных элементах хранятся в памяти главного
+  // процесса, а не в тексте системного буфера. Иначе при вставке в стороннюю
+  // программу вместо картинки появлялся бы JSON.
+  const internalJson = await refspace.clipboard.readItems();
+
+  if (internalJson) {
     try {
-      const parsed = JSON.parse(textData);
+      const parsed = JSON.parse(internalJson);
       if (parsed.myPureRefSignature === 'mpref1') {
         const mouseX = globalMouseX;
         const mouseY = globalMouseY;
@@ -2012,17 +2024,6 @@ async function doPaste(clipboardDataOverride, isMenuPaste = false) {
       }
     } catch (e) {
       console.error('Custom paste failed', e);
-    }
-  }
-
-  // Синхронно считываем файлы из clipboardData до первого await — после него e.clipboardData станет недоступен
-  const overridePastedFiles = [];
-  if (clipboardDataOverride && clipboardDataOverride.items) {
-    for (let i = 0; i < clipboardDataOverride.items.length; i++) {
-      if (clipboardDataOverride.items[i].type.indexOf('image') !== -1) {
-        const f = clipboardDataOverride.items[i].getAsFile();
-        if (f) overridePastedFiles.push(f);
-      }
     }
   }
 

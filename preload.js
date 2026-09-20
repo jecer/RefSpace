@@ -28,10 +28,10 @@ contextBridge.exposeInMainWorld('refspace', {
       ipcRenderer.on('project:open-file', (_e, filePath) => cb(filePath)),
   },
   clipboard: {
-    readText: () => invoke('clipboard:read-text'),
     readImage: () => invoke('clipboard:read-image'),
     writeImage: (dataUrl) => invoke('clipboard:write-image', dataUrl),
     writeItems: (payload) => invoke('clipboard:write-items', payload),
+    readItems: () => invoke('clipboard:read-items'),
   },
   media: {
     pathForDroppedFile: (file) => webUtils.getPathForFile(file),
